@@ -2,20 +2,21 @@ const API = '';
 let bandwidthHistory = [];
 let errorsHistory = [];
 let packetsHistory = [];
-let interfaceData = {};
-let connectionStatuses = {};
 let refreshInterval = null;
 
-// Chart contexts
 let bwCtx, errCtx, pktCtx, ifaceCtx, connCtx;
 
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
-    initCharts();
     loadDashboard();
     startAutoRefresh();
     initPing();
     initScanner();
+    window.addEventListener('resize', () => {
+        initCharts();
+        loadDashboard();
+    });
+    setTimeout(initCharts, 100);
 });
 
 function initTabs() {
@@ -25,27 +26,32 @@ function initTabs() {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             btn.classList.add('active');
             document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-
             if (btn.dataset.tab === 'interfaces') loadInterfaces();
             if (btn.dataset.tab === 'connections') loadConnections();
+            setTimeout(initCharts, 50);
         });
     });
 }
 
 function initCharts() {
-    bwCtx = setupCanvas('bandwidth-chart');
-    errCtx = setupCanvas('errors-chart');
-    pktCtx = setupCanvas('packets-chart');
-    ifaceCtx = setupCanvas('interface-chart');
-    connCtx = setupCanvas('connection-status-chart');
+    bwCtx = setupCanvas('bandwidth-chart', 220);
+    errCtx = setupCanvas('errors-chart', 220);
+    pktCtx = setupCanvas('packets-chart', 220);
+    ifaceCtx = setupCanvas('interface-chart', 220);
+    connCtx = setupCanvas('connection-status-chart', 220);
 }
 
-function setupCanvas(id) {
+function setupCanvas(id, height) {
     const canvas = document.getElementById(id);
     if (!canvas) return null;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = (rect.width - 36) * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = (rect.width - 36) + 'px';
+    canvas.style.height = height + 'px';
     const ctx = canvas.getContext('2d');
-    canvas.width = canvas.offsetWidth;
-    canvas.height = 180;
+    ctx.scale(dpr, dpr);
     return ctx;
 }
 
@@ -55,10 +61,9 @@ function startAutoRefresh() {
 
 async function loadDashboard() {
     try {
-        const [summary, listening, bandwidth, interfaces] = await Promise.all([
+        const [summary, listening, interfaces] = await Promise.all([
             fetch(API + '/api/summary').then(r => r.json()),
             fetch(API + '/api/listening').then(r => r.json()),
-            fetch(API + '/api/bandwidth').then(r => r.json()),
             fetch(API + '/api/interfaces').then(r => r.json())
         ]);
 
@@ -79,27 +84,19 @@ async function loadDashboard() {
 
 function updateHealth(health) {
     const score = health.score;
-    const scoreText = document.getElementById('score-text');
-    const scoreFill = document.getElementById('score-fill');
-    const healthStatus = document.getElementById('health-status');
-    const healthIssues = document.getElementById('health-issues');
-    const gatewayDisplay = document.getElementById('gateway-display');
-    const dnsDisplay = document.getElementById('dns-display');
-
-    scoreText.textContent = score;
+    document.getElementById('score-text').textContent = score;
     const offset = 339.292 - (339.292 * score / 100);
-    scoreFill.style.strokeDashoffset = offset;
+    document.getElementById('score-fill').style.strokeDashoffset = offset;
 
     let color = 'var(--green)';
     if (score < 40) color = 'var(--red)';
     else if (score < 60) color = 'var(--yellow)';
-    scoreFill.style.stroke = color;
+    document.getElementById('score-fill').style.stroke = color;
 
-    healthStatus.textContent = health.status;
-    healthIssues.textContent = health.issues.length > 0 ? health.issues.join(' // ') : 'no issues detected';
-
-    gatewayDisplay.textContent = 'gw: ' + (health.gateway || 'none');
-    dnsDisplay.textContent = 'dns: ' + (health.dns_servers.length > 0 ? health.dns_servers[0] : 'none');
+    document.getElementById('health-status').textContent = health.status;
+    document.getElementById('health-issues').textContent = health.issues.length > 0 ? health.issues.join(' // ') : 'no issues detected';
+    document.getElementById('gateway-display').textContent = 'gw: ' + (health.gateway || 'none');
+    document.getElementById('dns-display').textContent = 'dns: ' + (health.dns_servers.length > 0 ? health.dns_servers[0] : 'none');
 }
 
 function updateBandwidth(bw) {
@@ -119,367 +116,347 @@ function updateStats(summary) {
 }
 
 function updateListeningPorts(ports) {
-    const tbody = document.getElementById('listening-tbody');
-    tbody.innerHTML = ports.map(p => `
-        <tr>
-            <td>${p.port}</td>
-            <td>${p.address}</td>
-            <td>${p.process}</td>
-            <td>${p.pid || '-'}</td>
-        </tr>
-    `).join('');
+    document.getElementById('listening-tbody').innerHTML = ports.map(p =>
+        `<tr><td>${p.port}</td><td>${p.address}</td><td>${p.process}</td><td>${p.pid || '-'}</td></tr>`
+    ).join('');
 }
 
 function updateListeningPortsSmall(ports) {
-    const tbody = document.getElementById('listening-tbody-small');
-    tbody.innerHTML = ports.slice(0, 8).map(p => `
-        <tr>
-            <td>${p.port}</td>
-            <td>${p.process}</td>
-            <td>${p.pid || '-'}</td>
-        </tr>
-    `).join('');
+    document.getElementById('listening-tbody-small').innerHTML = ports.slice(0, 8).map(p =>
+        `<tr><td>${p.port}</td><td>${p.process}</td><td>${p.pid || '-'}</td></tr>`
+    ).join('');
 }
 
-// ========== CHARTS ==========
+// ==================== CHART HELPERS ====================
 
-function drawGrid(ctx, w, h, rows) {
-    ctx.strokeStyle = '#e0e0e0';
+const FONT = '14px IBM Plex Mono, Courier New, monospace';
+const FONT_SM = '12px IBM Plex Mono, Courier New, monospace';
+const FONT_LG = 'bold 14px IBM Plex Mono, Courier New, monospace';
+const COL_TEXT = '#000000';
+const COL_MUTED = '#333333';
+const COL_LIGHT = '#777777';
+const COL_GRID = '#dddddd';
+
+function getCanvasSize(id) {
+    const canvas = document.getElementById(id);
+    if (!canvas) return { w: 0, h: 0 };
+    return { w: canvas.width / (window.devicePixelRatio || 1), h: canvas.height / (window.devicePixelRatio || 1) };
+}
+
+function drawGrid(ctx, w, h, rows, topPad, bottomPad) {
+    topPad = topPad || 30;
+    bottomPad = bottomPad || 30;
+    ctx.strokeStyle = COL_GRID;
     ctx.lineWidth = 1;
     for (let i = 0; i <= rows; i++) {
-        const y = (h / rows) * i + 8;
+        const y = topPad + ((h - topPad - bottomPad) / rows) * i;
         ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
+        ctx.moveTo(50, y);
+        ctx.lineTo(w - 10, y);
         ctx.stroke();
     }
 }
 
-function drawLabels(ctx, w, h, maxVal, rows) {
-    ctx.font = '10px IBM Plex Mono, Courier New, monospace';
-    ctx.fillStyle = '#888888';
+function drawYLabels(ctx, h, maxVal, rows, topPad, bottomPad, formatter) {
+    topPad = topPad || 30;
+    bottomPad = bottomPad || 30;
+    formatter = formatter || formatBytesShort;
+    ctx.font = FONT_SM;
+    ctx.fillStyle = COL_MUTED;
     ctx.textAlign = 'right';
     for (let i = 0; i <= rows; i++) {
-        const y = (h / rows) * i + 12;
+        const y = topPad + ((h - topPad - bottomPad) / rows) * i;
         const val = maxVal - (maxVal / rows) * i;
-        ctx.fillText(formatBytesShort(val), 45, y);
+        ctx.fillText(formatter(val), 46, y + 4);
     }
     ctx.textAlign = 'left';
 }
 
-function drawLegend(ctx, items) {
-    let x = 10;
-    ctx.font = '10px IBM Plex Mono, Courier New, monospace';
+function drawLegend(ctx, items, x, y) {
+    x = x || 55;
+    y = y || 16;
+    ctx.font = FONT_SM;
+    let cx = x;
     items.forEach(item => {
         ctx.fillStyle = item.color;
-        ctx.fillRect(x, 6, 12, 3);
-        ctx.fillStyle = '#555555';
-        ctx.fillText(item.label, x + 16, 11);
-        x += ctx.measureText(item.label).width + 32;
+        ctx.fillRect(cx, y - 6, 14, 4);
+        ctx.fillStyle = COL_MUTED;
+        ctx.fillText(item.label, cx + 18, y);
+        cx += ctx.measureText(item.label).width + 40;
     });
 }
 
+// ==================== BANDWIDTH CHART ====================
+
 function updateBandwidthChart(bw) {
-    bandwidthHistory.push({
-        up: bw.bytes_sent_rate,
-        down: bw.bytes_recv_rate,
-    });
+    bandwidthHistory.push({ up: bw.bytes_sent_rate, down: bw.bytes_recv_rate });
     if (bandwidthHistory.length > 60) bandwidthHistory.shift();
 
-    if (!bwCtx) return;
-    const canvas = document.getElementById('bandwidth-chart');
-    const w = canvas.width;
-    const h = canvas.height;
+    const { w, h } = getCanvasSize('bandwidth-chart');
+    if (!bwCtx || w === 0) return;
 
     bwCtx.clearRect(0, 0, w, h);
-    drawGrid(bwCtx, w, h, 4);
+    const top = 35, bot = 10;
+    drawGrid(bwCtx, w, h, 5, top, bot);
 
-    const maxVal = Math.max(
-        ...bandwidthHistory.map(d => d.up),
-        ...bandwidthHistory.map(d => d.down),
-        1024
-    );
+    const maxVal = Math.max(...bandwidthHistory.map(d => d.up), ...bandwidthHistory.map(d => d.down), 1024);
+    drawYLabels(bwCtx, h, maxVal, 5, top, bot);
 
-    drawLabels(bwCtx, w, h, maxVal, 4);
+    const left = 55;
+    const cw = w - left - 10;
+    const step = cw / (bandwidthHistory.length - 1 || 1);
 
-    const chartLeft = 50;
-    const chartW = w - chartLeft - 10;
-    const step = chartW / (bandwidthHistory.length - 1 || 1);
-
-    // Download line (solid)
+    // Download fill
     bwCtx.beginPath();
-    bwCtx.strokeStyle = '#111111';
-    bwCtx.lineWidth = 2;
+    bwCtx.fillStyle = 'rgba(0,0,0,0.06)';
     bandwidthHistory.forEach((d, i) => {
-        const x = chartLeft + i * step;
-        const y = h - (d.down / maxVal) * (h - 30) - 10;
+        const x = left + i * step;
+        const y = h - bot - (d.down / maxVal) * (h - top - bot);
+        i === 0 ? bwCtx.moveTo(x, y) : bwCtx.lineTo(x, y);
+    });
+    bwCtx.lineTo(left + (bandwidthHistory.length - 1) * step, h - bot);
+    bwCtx.lineTo(left, h - bot);
+    bwCtx.fill();
+
+    // Download line
+    bwCtx.beginPath();
+    bwCtx.strokeStyle = COL_TEXT;
+    bwCtx.lineWidth = 2.5;
+    bandwidthHistory.forEach((d, i) => {
+        const x = left + i * step;
+        const y = h - bot - (d.down / maxVal) * (h - top - bot);
         i === 0 ? bwCtx.moveTo(x, y) : bwCtx.lineTo(x, y);
     });
     bwCtx.stroke();
 
-    // Upload line (dashed)
+    // Upload line
     bwCtx.beginPath();
-    bwCtx.strokeStyle = '#888888';
-    bwCtx.lineWidth = 1.5;
-    bwCtx.setLineDash([5, 5]);
+    bwCtx.strokeStyle = COL_LIGHT;
+    bwCtx.lineWidth = 2;
+    bwCtx.setLineDash([6, 4]);
     bandwidthHistory.forEach((d, i) => {
-        const x = chartLeft + i * step;
-        const y = h - (d.up / maxVal) * (h - 30) - 10;
+        const x = left + i * step;
+        const y = h - bot - (d.up / maxVal) * (h - top - bot);
         i === 0 ? bwCtx.moveTo(x, y) : bwCtx.lineTo(x, y);
     });
     bwCtx.stroke();
     bwCtx.setLineDash([]);
 
     drawLegend(bwCtx, [
-        { color: '#111111', label: 'download' },
-        { color: '#888888', label: 'upload' }
+        { color: COL_TEXT, label: 'download' },
+        { color: COL_LIGHT, label: 'upload' }
     ]);
 }
 
+// ==================== ERRORS CHART ====================
+
 function updateErrorsChart(bw) {
-    errorsHistory.push({
-        errors: bw.errin + bw.errout,
-        drops: bw.dropin + bw.dropout
-    });
+    errorsHistory.push({ errors: bw.errin + bw.errout, drops: bw.dropin + bw.dropout });
     if (errorsHistory.length > 60) errorsHistory.shift();
 
-    if (!errCtx) return;
-    const canvas = document.getElementById('errors-chart');
-    const w = canvas.width;
-    const h = canvas.height;
+    const { w, h } = getCanvasSize('errors-chart');
+    if (!errCtx || w === 0) return;
 
     errCtx.clearRect(0, 0, w, h);
-    drawGrid(errCtx, w, h, 4);
+    const top = 35, bot = 10;
+    drawGrid(errCtx, w, h, 5, top, bot);
 
-    const maxVal = Math.max(
-        ...errorsHistory.map(d => d.errors),
-        ...errorsHistory.map(d => d.drops),
-        10
-    );
+    const maxVal = Math.max(...errorsHistory.map(d => d.errors), ...errorsHistory.map(d => d.drops), 10);
+    drawYLabels(errCtx, h, maxVal, 5, top, bot);
 
-    drawLabels(errCtx, w, h, maxVal, 4);
+    const left = 55;
+    const cw = w - left - 10;
+    const step = cw / (errorsHistory.length || 1);
+    const barW = Math.max(step * 0.5, 3);
 
-    const chartLeft = 50;
-    const chartW = w - chartLeft - 10;
-    const step = chartW / (errorsHistory.length - 1 || 1);
-    const barW = Math.max(step * 0.6, 2);
-
-    // Errors bars
-    errCtx.fillStyle = '#b22222';
     errorsHistory.forEach((d, i) => {
-        const x = chartLeft + i * step;
-        const barH = (d.errors / maxVal) * (h - 30);
-        if (barH > 0) {
-            errCtx.fillRect(x - barW/2, h - barH - 10, barW, barH);
+        const x = left + i * step + step * 0.15;
+        const eH = (d.errors / maxVal) * (h - top - bot);
+        const dH = (d.drops / maxVal) * (h - top - bot);
+
+        if (eH > 0) {
+            errCtx.fillStyle = '#991111';
+            errCtx.fillRect(x, h - bot - eH, barW, eH);
         }
-    });
-
-    // Drops bars
-    errCtx.fillStyle = '#a07000';
-    errorsHistory.forEach((d, i) => {
-        const x = chartLeft + i * step + barW * 0.4;
-        const barH = (d.drops / maxVal) * (h - 30);
-        if (barH > 0) {
-            errCtx.fillRect(x - barW/2, h - barH - 10, barW * 0.8, barH);
+        if (dH > 0) {
+            errCtx.fillStyle = '#8a5e00';
+            errCtx.fillRect(x + barW + 2, h - bot - dH, barW, dH);
         }
     });
 
     drawLegend(errCtx, [
-        { color: '#b22222', label: 'errors' },
-        { color: '#a07000', label: 'drops' }
+        { color: '#991111', label: 'errors' },
+        { color: '#8a5e00', label: 'drops' }
     ]);
 }
 
+// ==================== PACKETS CHART ====================
+
 function updatePacketsChart(bw) {
-    packetsHistory.push({
-        sent: bw.packets_sent,
-        recv: bw.packets_recv
-    });
+    packetsHistory.push({ sent: bw.packets_sent, recv: bw.packets_recv });
     if (packetsHistory.length > 2) packetsHistory.shift();
 
-    if (packetsHistory.length < 2 || !pktCtx) return;
-
-    const canvas = document.getElementById('packets-chart');
-    const w = canvas.width;
-    const h = canvas.height;
+    const { w, h } = getCanvasSize('packets-chart');
+    if (packetsHistory.length < 2 || !pktCtx || w === 0) return;
 
     pktCtx.clearRect(0, 0, w, h);
-    drawGrid(pktCtx, w, h, 4);
+    const top = 35, bot = 35;
 
     const prev = packetsHistory[0];
     const curr = packetsHistory[1];
     const deltaSent = curr.sent - prev.sent;
     const deltaRecv = curr.recv - prev.recv;
-
     const maxVal = Math.max(deltaSent, deltaRecv, 100);
 
-    const chartLeft = 50;
-    const barWidth = (w - chartLeft - 20) / 4;
-    const barGap = 20;
+    drawGrid(pktCtx, w, h, 5, top, bot);
+    drawYLabels(pktCtx, h, maxVal, 5, top, bot, formatNumber);
 
-    // Bars
+    const left = 55;
+    const barWidth = (w - left - 30) / 3;
+
     const bars = [
-        { label: 'pkt_sent', value: deltaSent, color: '#555555' },
-        { label: 'pkt_recv', value: deltaRecv, color: '#111111' }
+        { label: 'pkt_sent', value: deltaSent, color: '#333333' },
+        { label: 'pkt_recv', value: deltaRecv, color: '#000000' }
     ];
 
     bars.forEach((bar, i) => {
-        const x = chartLeft + i * (barWidth + barGap);
-        const barH = (bar.value / maxVal) * (h - 40);
+        const x = left + i * (barWidth + 16);
+        const barH = (bar.value / maxVal) * (h - top - bot);
 
         pktCtx.fillStyle = bar.color;
-        pktCtx.fillRect(x, h - barH - 20, barWidth, barH);
+        pktCtx.fillRect(x, h - bot - barH, barWidth, barH);
 
-        pktCtx.font = '10px IBM Plex Mono, Courier New, monospace';
-        pktCtx.fillStyle = '#555555';
+        pktCtx.font = FONT_SM;
+        pktCtx.fillStyle = COL_MUTED;
         pktCtx.textAlign = 'center';
-        pktCtx.fillText(bar.label, x + barWidth/2, h - 6);
-        pktCtx.fillText(formatNumber(bar.value), x + barWidth/2, h - barH - 26);
+        pktCtx.fillText(bar.label, x + barWidth / 2, h - 12);
+        pktCtx.font = FONT_LG;
+        pktCtx.fillStyle = COL_TEXT;
+        pktCtx.fillText(formatNumber(bar.value), x + barWidth / 2, h - bot - barH - 8);
     });
-
     pktCtx.textAlign = 'left';
 }
 
-function updateInterfaceChart(interfaces) {
-    if (!ifaceCtx) return;
+// ==================== INTERFACE CHART ====================
 
-    const canvas = document.getElementById('interface-chart');
-    const w = canvas.width;
-    const h = canvas.height;
+function updateInterfaceChart(interfaces) {
+    const { w, h } = getCanvasSize('interface-chart');
+    if (!ifaceCtx || w === 0) return;
 
     ifaceCtx.clearRect(0, 0, w, h);
-
     const active = interfaces.filter(i => i.is_up);
+
     if (active.length === 0) {
-        ifaceCtx.font = '12px IBM Plex Mono, Courier New, monospace';
-        ifaceCtx.fillStyle = '#888888';
-        ifaceCtx.fillText('no active interfaces', 20, h/2);
+        ifaceCtx.font = FONT;
+        ifaceCtx.fillStyle = COL_LIGHT;
+        ifaceCtx.fillText('no active interfaces', 60, h / 2);
         return;
     }
 
     const maxBytes = Math.max(...active.map(i => Math.max(i.bytes_sent, i.bytes_recv)), 1024);
-
-    const chartLeft = 10;
-    const chartW = w - chartLeft - 10;
-    const barHeight = Math.min(24, (h - 20) / active.length - 8);
-    const barGap = 8;
+    const barH = Math.min(28, (h - 40) / active.length - 10);
+    const gap = 10;
 
     active.forEach((iface, i) => {
-        const y = 20 + i * (barHeight * 2 + barGap);
-        if (y + barHeight * 2 > h) return;
+        const y = 20 + i * (barH * 2 + gap + 16);
+        if (y + barH * 2 + 16 > h) return;
 
-        // Label
-        ifaceCtx.font = '9px IBM Plex Mono, Courier New, monospace';
+        ifaceCtx.font = FONT_SM;
+        ifaceCtx.fillStyle = COL_MUTED;
+        ifaceCtx.fillText(iface.name, 10, y);
+
+        const maxW = w - 140;
+        const sentW = (iface.bytes_sent / maxBytes) * maxW;
+        const recvW = (iface.bytes_recv / maxBytes) * maxW;
+
         ifaceCtx.fillStyle = '#555555';
-        ifaceCtx.fillText(iface.name.substring(0, 15), chartLeft, y + 2);
+        ifaceCtx.fillRect(10, y + 6, Math.max(sentW, 3), barH);
 
-        // Sent bar
-        const sentW = (iface.bytes_sent / maxBytes) * chartW;
-        ifaceCtx.fillStyle = '#555555';
-        ifaceCtx.fillRect(chartLeft, y + 6, Math.max(sentW, 2), barHeight);
+        ifaceCtx.fillStyle = '#000000';
+        ifaceCtx.fillRect(10, y + 6 + barH + 2, Math.max(recvW, 3), barH);
 
-        // Recv bar
-        const recvW = (iface.bytes_recv / maxBytes) * chartW;
-        ifaceCtx.fillStyle = '#111111';
-        ifaceCtx.fillRect(chartLeft, y + 6 + barHeight + 2, Math.max(recvW, 2), barHeight);
-
-        // Values
-        ifaceCtx.font = '8px IBM Plex Mono, Courier New, monospace';
-        ifaceCtx.fillStyle = '#888888';
-        ifaceCtx.fillText('s:' + formatBytesShort(iface.bytes_sent), chartLeft + Math.max(sentW, 2) + 4, y + 6 + barHeight - 2);
-        ifaceCtx.fillText('r:' + formatBytesShort(iface.bytes_recv), chartLeft + Math.max(recvW, 2) + 4, y + 6 + barHeight * 2);
+        ifaceCtx.font = FONT_SM;
+        ifaceCtx.fillStyle = COL_MUTED;
+        const sx = 14 + Math.max(sentW, 3);
+        const rx = 14 + Math.max(recvW, 3);
+        if (sx + 80 < w) ifaceCtx.fillText('s:' + formatBytesShort(iface.bytes_sent), sx, y + 6 + barH - 3);
+        if (rx + 80 < w) ifaceCtx.fillText('r:' + formatBytesShort(iface.bytes_recv), rx, y + 6 + barH * 2 + 2);
     });
 }
 
+// ==================== CONNECTION PIE ====================
+
 function updateConnectionStatusChart() {
-    // Fetch connections and count statuses
     fetch(API + '/api/connections')
         .then(r => r.json())
         .then(data => {
             const counts = {};
-            data.forEach(c => {
-                counts[c.status] = (counts[c.status] || 0) + 1;
-            });
+            data.forEach(c => { counts[c.status] = (counts[c.status] || 0) + 1; });
             drawConnectionPie(counts);
         })
         .catch(() => {});
 }
 
 function drawConnectionPie(counts) {
-    if (!connCtx) return;
-
-    const canvas = document.getElementById('connection-status-chart');
-    const w = canvas.width;
-    const h = canvas.height;
+    const { w, h } = getCanvasSize('connection-status-chart');
+    if (!connCtx || w === 0) return;
 
     connCtx.clearRect(0, 0, w, h);
-
     const entries = Object.entries(counts);
+
     if (entries.length === 0) {
-        connCtx.font = '12px IBM Plex Mono, Courier New, monospace';
-        connCtx.fillStyle = '#888888';
-        connCtx.fillText('no connections', 20, h/2);
+        connCtx.font = FONT;
+        connCtx.fillStyle = COL_LIGHT;
+        connCtx.fillText('no connections', 60, h / 2);
         return;
     }
 
-    const total = entries.reduce((sum, e) => sum + e[1], 0);
-    const cx = 70;
+    const total = entries.reduce((s, e) => s + e[1], 0);
+    const r = Math.min(70, h / 2 - 20);
+    const cx = r + 30;
     const cy = h / 2;
-    const r = 50;
 
     const colors = {
-        'ESTABLISHED': '#111111',
-        'LISTEN': '#555555',
-        'TIME_WAIT': '#a07000',
-        'CLOSE_WAIT': '#b22222',
-        'SYN_SENT': '#777777',
-        'SYN_RECEIVED': '#999999',
-        'FIN_WAIT_1': '#bbbbbb',
-        'FIN_WAIT_2': '#cccccc',
-        'CLOSING': '#888888',
-        'LAST_ACK': '#666666',
-        'UNKNOWN': '#aaaaaa'
+        'ESTABLISHED': '#000000', 'LISTEN': '#333333', 'TIME_WAIT': '#8a5e00',
+        'CLOSE_WAIT': '#991111', 'SYN_SENT': '#555555', 'SYN_RECEIVED': '#777777',
+        'FIN_WAIT_1': '#999999', 'FIN_WAIT_2': '#aaaaaa', 'CLOSING': '#666666',
+        'LAST_ACK': '#444444', 'UNKNOWN': '#bbbbbb'
     };
 
-    let startAngle = -Math.PI / 2;
+    let angle = -Math.PI / 2;
     entries.forEach(([status, count]) => {
-        const sliceAngle = (count / total) * Math.PI * 2;
-        const color = colors[status] || '#cccccc';
-
+        const slice = (count / total) * Math.PI * 2;
         connCtx.beginPath();
         connCtx.moveTo(cx, cy);
-        connCtx.arc(cx, cy, r, startAngle, startAngle + sliceAngle);
+        connCtx.arc(cx, cy, r, angle, angle + slice);
         connCtx.closePath();
-        connCtx.fillStyle = color;
+        connCtx.fillStyle = colors[status] || '#cccccc';
         connCtx.fill();
         connCtx.strokeStyle = '#ffffff';
-        connCtx.lineWidth = 2;
+        connCtx.lineWidth = 3;
         connCtx.stroke();
-
-        startAngle += sliceAngle;
+        angle += slice;
     });
 
-    // Legend on the right
-    const legendX = 140;
-    let legendY = 20;
-    connCtx.font = '10px IBM Plex Mono, Courier New, monospace';
+    const lx = cx + r + 24;
+    let ly = 16;
+    connCtx.font = FONT_SM;
     entries.forEach(([status, count]) => {
-        const color = colors[status] || '#cccccc';
-        connCtx.fillStyle = color;
-        connCtx.fillRect(legendX, legendY, 10, 10);
-        connCtx.fillStyle = '#111111';
-        connCtx.fillText(status.toLowerCase() + ' (' + count + ')', legendX + 16, legendY + 9);
-        legendY += 18;
+        if (ly > h - 10) return;
+        connCtx.fillStyle = colors[status] || '#cccccc';
+        connCtx.fillRect(lx, ly - 4, 12, 12);
+        connCtx.fillStyle = COL_TEXT;
+        connCtx.fillText(status.toLowerCase() + ' (' + count + ')', lx + 18, ly + 7);
+        ly += 22;
     });
 }
 
-// ========== INTERFACES TAB ==========
+// ==================== INTERFACES TAB ====================
 
 async function loadInterfaces() {
     try {
         const data = await fetch(API + '/api/interfaces').then(r => r.json());
-        const container = document.getElementById('interfaces-list');
-        container.innerHTML = data.map(iface => `
+        document.getElementById('interfaces-list').innerHTML = data.map(iface => `
             <div class="interface-card">
                 <div class="interface-header">
                     <span class="interface-name">${iface.name}</span>
@@ -516,52 +493,38 @@ async function loadInterfaces() {
     }
 }
 
-// ========== CONNECTIONS TAB ==========
+// ==================== CONNECTIONS TAB ====================
 
 async function loadConnections() {
     try {
         const data = await fetch(API + '/api/connections').then(r => r.json());
-        const tbody = document.getElementById('connections-tbody');
-        tbody.innerHTML = data.slice(0, 100).map(c => {
-            const statusClass = c.status === 'ESTABLISHED' ? 'established'
-                : c.status === 'LISTEN' ? 'listen'
-                : c.status === 'TIME_WAIT' ? 'time-wait'
-                : c.status === 'CLOSE_WAIT' ? 'close-wait'
-                : 'default';
-            return `
-                <tr>
-                    <td>${c.laddr || '-'}</td>
-                    <td>${c.raddr || '-'}</td>
-                    <td><span class="status-badge ${statusClass}">${c.status.toLowerCase()}</span></td>
-                    <td>${c.type.includes('SOCK_STREAM') ? 'tcp' : 'udp'}</td>
-                    <td>${c.pid || '-'}</td>
-                </tr>
-            `;
+        document.getElementById('connections-tbody').innerHTML = data.slice(0, 100).map(c => {
+            const sc = c.status === 'ESTABLISHED' ? 'established' : c.status === 'LISTEN' ? 'listen'
+                : c.status === 'TIME_WAIT' ? 'time-wait' : c.status === 'CLOSE_WAIT' ? 'close-wait' : 'default';
+            return `<tr><td>${c.laddr || '-'}</td><td>${c.raddr || '-'}</td>
+                <td><span class="status-badge ${sc}">${c.status.toLowerCase()}</span></td>
+                <td>${c.type.includes('SOCK_STREAM') ? 'tcp' : 'udp'}</td><td>${c.pid || '-'}</td></tr>`;
         }).join('');
     } catch (e) {
         console.error('Load connections error:', e);
     }
 }
 
-// ========== PING ==========
+// ==================== PING ====================
 
 function initPing() {
     document.getElementById('ping-btn').addEventListener('click', async () => {
         const host = document.getElementById('ping-host').value.trim();
         if (!host) return;
-
         const resultDiv = document.getElementById('ping-result');
         const btn = document.getElementById('ping-btn');
         btn.disabled = true;
         resultDiv.textContent = '> ping ' + host;
-
         try {
             const data = await fetch(API + '/api/ping?host=' + encodeURIComponent(host)).then(r => r.json());
-            if (data.status === 'up') {
-                resultDiv.innerHTML = `> ${data.host} is up <span style="color:var(--green);font-weight:600">[ok]</span> // ${data.latency}ms`;
-            } else {
-                resultDiv.innerHTML = `> ${data.host} is down <span style="color:var(--red);font-weight:600">[fail]</span>`;
-            }
+            resultDiv.innerHTML = data.status === 'up'
+                ? `> ${data.host} is up <span style="color:var(--green);font-weight:700">[ok]</span> // ${data.latency}ms`
+                : `> ${data.host} is down <span style="color:var(--red);font-weight:700">[fail]</span>`;
         } catch (e) {
             resultDiv.innerHTML = `> error: ${e.message}`;
         }
@@ -569,25 +532,22 @@ function initPing() {
     });
 }
 
-// ========== SCANNER ==========
+// ==================== SCANNER ====================
 
 function initScanner() {
     document.getElementById('scan-btn').addEventListener('click', async () => {
         const subnet = document.getElementById('scan-subnet').value.trim();
         const btn = document.getElementById('scan-btn');
         const status = document.getElementById('scan-status');
-
         btn.disabled = true;
         status.textContent = 'scanning...';
         status.style.color = 'var(--yellow)';
-
         try {
             await fetch(API + '/api/scan', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ subnet: subnet || null })
             });
-
             const poll = setInterval(async () => {
                 const data = await fetch(API + '/api/scan/results').then(r => r.json());
                 if (!data.in_progress) {
@@ -595,7 +555,14 @@ function initScanner() {
                     btn.disabled = false;
                     status.textContent = data.devices.length + ' found';
                     status.style.color = 'var(--green)';
-                    renderDevices(data.devices);
+                    document.getElementById('devices-grid').innerHTML = data.devices.map(d => `
+                        <div class="device-card">
+                            <div class="device-icon">[device]</div>
+                            <div class="device-ip">${d.ip}</div>
+                            <div class="device-mac">${d.mac}</div>
+                            <div class="device-vendor">${d.vendor}</div>
+                        </div>
+                    `).join('');
                 }
             }, 1000);
         } catch (e) {
@@ -606,19 +573,7 @@ function initScanner() {
     });
 }
 
-function renderDevices(devices) {
-    const grid = document.getElementById('devices-grid');
-    grid.innerHTML = devices.map(d => `
-        <div class="device-card">
-            <div class="device-icon">[device]</div>
-            <div class="device-ip">${d.ip}</div>
-            <div class="device-mac">${d.mac}</div>
-            <div class="device-vendor">${d.vendor}</div>
-        </div>
-    `).join('');
-}
-
-// ========== UTILS ==========
+// ==================== UTILS ====================
 
 function formatBytes(bytes) {
     if (bytes === 0) return '0 B';

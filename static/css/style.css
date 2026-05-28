@@ -7,18 +7,18 @@
 }
 
 :root {
-    --bg: #f8f8f8;
+    --bg: #f5f5f5;
     --bg-card: #ffffff;
-    --bg-hover: #f0f0f0;
-    --text: #111111;
-    --text-muted: #555555;
-    --text-light: #777777;
-    --border: #d0d0d0;
-    --border-dark: #aaaaaa;
-    --green: #1a7a3a;
-    --yellow: #a07000;
-    --red: #b22222;
-    --accent: #111111;
+    --bg-hover: #ebebeb;
+    --text: #000000;
+    --text-muted: #333333;
+    --text-light: #555555;
+    --border: #cccccc;
+    --border-dark: #999999;
+    --green: #0a6e2a;
+    --yellow: #8a5e00;
+    --red: #991111;
+    --accent: #000000;
 }
 
 body {
@@ -26,7 +26,7 @@ body {
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
-    font-size: 13px;
+    font-size: 14px;
     line-height: 1.6;
 }
 
@@ -36,29 +36,29 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 0 24px;
-    height: 50px;
+    height: 52px;
     background: var(--bg-card);
-    border-bottom: 2px solid var(--text);
+    border-bottom: 3px solid var(--text);
     position: sticky;
     top: 0;
     z-index: 100;
 }
 
 .nav-brand {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 600;
     letter-spacing: -0.5px;
 }
 
 .logo {
-    color: var(--text-muted);
+    color: var(--text-light);
 }
 
 .nav-version {
-    color: var(--text-muted);
+    color: var(--text-light);
     font-weight: 400;
     margin-left: 6px;
-    font-size: 11px;
+    font-size: 12px;
 }
 
 .nav-links {
@@ -68,12 +68,12 @@ body {
 
 .nav-btn {
     background: none;
-    border: 1px solid transparent;
-    color: var(--text-muted);
-    padding: 6px 14px;
+    border: 2px solid transparent;
+    color: var(--text-light);
+    padding: 6px 16px;
     cursor: pointer;
     font-family: inherit;
-    font-size: 12px;
+    font-size: 13px;
     transition: all 0.15s;
 }
 
@@ -93,7 +93,7 @@ body {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 11px;
+    font-size: 12px;
     color: var(--text-muted);
 }
 
@@ -120,7 +120,7 @@ body {
 
 /* Container */
 .container {
-    max-width: 1300px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 20px 24px;
 }
@@ -136,7 +136,7 @@ body {
 
 /* Card Header */
 .card-header {
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--text-muted);
     text-transform: lowercase;
@@ -149,40 +149,40 @@ body {
 /* Health Banner */
 .health-banner {
     background: var(--bg-card);
-    border: 2px solid var(--text);
-    padding: 20px;
-    margin-bottom: 16px;
+    border: 3px solid var(--text);
+    padding: 24px;
+    margin-bottom: 20px;
 }
 
 .health-score {
     display: flex;
     align-items: center;
-    gap: 24px;
+    gap: 28px;
 }
 
 .score-circle {
     position: relative;
-    width: 110px;
-    height: 110px;
+    width: 120px;
+    height: 120px;
     flex-shrink: 0;
 }
 
 .score-circle svg {
     transform: rotate(-90deg);
-    width: 110px;
-    height: 110px;
+    width: 120px;
+    height: 120px;
 }
 
 .score-bg {
     fill: none;
     stroke: var(--border);
-    stroke-width: 8;
+    stroke-width: 10;
 }
 
 .score-fill {
     fill: none;
     stroke: var(--green);
-    stroke-width: 8;
+    stroke-width: 10;
     stroke-linecap: square;
     stroke-dasharray: 339.292;
     stroke-dashoffset: 339.292;
@@ -194,14 +194,14 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 1.8rem;
+    font-size: 2rem;
     font-weight: 600;
     font-family: 'IBM Plex Mono', monospace;
     color: var(--text);
 }
 
 .health-info h2 {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 600;
     text-transform: lowercase;
     color: var(--text);
@@ -209,17 +209,17 @@ body {
 
 .health-info p {
     color: var(--text-muted);
-    font-size: 12px;
+    font-size: 14px;
     margin-top: 4px;
 }
 
 .health-meta {
-    margin-top: 16px;
-    font-size: 12px;
+    margin-top: 18px;
+    font-size: 14px;
     color: var(--text-muted);
     letter-spacing: 0.5px;
-    padding-top: 12px;
-    border-top: 1px solid var(--border);
+    padding-top: 14px;
+    border-top: 2px solid var(--border);
 }
 
 .meta-sep {
@@ -231,28 +231,28 @@ body {
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 1px;
+    gap: 2px;
     background: var(--text);
-    border: 2px solid var(--text);
-    margin-bottom: 16px;
+    border: 3px solid var(--text);
+    margin-bottom: 20px;
 }
 
 .stat-card {
     background: var(--bg-card);
-    padding: 18px 20px;
+    padding: 20px 22px;
 }
 
 .stat-label {
-    font-size: 10px;
+    font-size: 12px;
     color: var(--text-muted);
     text-transform: lowercase;
     letter-spacing: 1px;
     margin-bottom: 6px;
-    font-weight: 500;
+    font-weight: 600;
 }
 
 .stat-value {
-    font-size: 22px;
+    font-size: 26px;
     font-weight: 600;
     letter-spacing: -0.5px;
     color: var(--text);
@@ -263,31 +263,31 @@ body {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 16px;
-    margin-bottom: 16px;
+    margin-bottom: 20px;
 }
 
 .charts-row-triple {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
     gap: 16px;
-    margin-bottom: 16px;
+    margin-bottom: 20px;
 }
 
 .chart-card {
     background: var(--bg-card);
-    border: 2px solid var(--text);
-    padding: 16px;
+    border: 3px solid var(--text);
+    padding: 18px;
 }
 
 canvas {
     width: 100% !important;
-    height: 180px !important;
+    display: block;
 }
 
 .traffic-stats {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1px;
+    gap: 2px;
     background: var(--border);
 }
 
@@ -295,7 +295,7 @@ canvas {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 12px;
+    padding: 12px 14px;
     background: var(--bg-card);
 }
 
@@ -305,39 +305,40 @@ canvas {
 }
 
 .traffic-label {
-    font-size: 11px;
+    font-size: 13px;
     color: var(--text-muted);
     text-transform: lowercase;
+    font-weight: 500;
 }
 
 .traffic-value {
-    font-size: 13px;
-    font-weight: 500;
+    font-size: 15px;
+    font-weight: 600;
     color: var(--text);
 }
 
 /* Ping */
 .ping-section {
     background: var(--bg-card);
-    border: 2px solid var(--text);
-    padding: 16px;
-    margin-bottom: 16px;
+    border: 3px solid var(--text);
+    padding: 18px;
+    margin-bottom: 20px;
 }
 
 .ping-form {
     display: flex;
-    gap: 8px;
-    margin-bottom: 10px;
+    gap: 10px;
+    margin-bottom: 12px;
 }
 
 .ping-form input {
     flex: 1;
-    padding: 8px 12px;
+    padding: 10px 14px;
     border: 2px solid var(--border);
     background: var(--bg);
     color: var(--text);
     font-family: inherit;
-    font-size: 12px;
+    font-size: 14px;
     outline: none;
 }
 
@@ -346,12 +347,12 @@ canvas {
 }
 
 .btn {
-    padding: 8px 20px;
-    border: 2px solid var(--text);
+    padding: 10px 24px;
+    border: 3px solid var(--text);
     background: var(--bg-card);
     color: var(--text);
     font-family: inherit;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     text-transform: lowercase;
@@ -373,18 +374,18 @@ canvas {
 
 .ping-result {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px;
+    font-size: 14px;
     color: var(--text-muted);
-    padding: 10px;
+    padding: 12px;
     background: var(--bg);
-    border: 1px solid var(--border);
-    min-height: 36px;
+    border: 2px solid var(--border);
+    min-height: 40px;
 }
 
 /* Tables */
 .table-wrapper {
     overflow-x: auto;
-    border: 2px solid var(--text);
+    border: 3px solid var(--text);
 }
 
 table {
@@ -395,20 +396,20 @@ table {
 
 th {
     text-align: left;
-    padding: 10px 14px;
+    padding: 12px 16px;
     background: var(--bg);
     color: var(--text-muted);
-    font-size: 10px;
+    font-size: 12px;
     text-transform: lowercase;
     letter-spacing: 1px;
     font-weight: 600;
-    border-bottom: 2px solid var(--text);
+    border-bottom: 3px solid var(--text);
 }
 
 td {
-    padding: 10px 14px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--border);
-    font-size: 12px;
+    font-size: 13px;
     color: var(--text);
 }
 
@@ -421,8 +422,8 @@ tr:hover td {
 }
 
 .status-badge {
-    padding: 2px 8px;
-    font-size: 10px;
+    padding: 3px 10px;
+    font-size: 11px;
     font-weight: 600;
     text-transform: lowercase;
     letter-spacing: 0.5px;
@@ -433,41 +434,41 @@ tr:hover td {
 .status-badge.listen { border-color: var(--text); color: var(--text); }
 .status-badge.time-wait { border-color: var(--yellow); color: var(--yellow); }
 .status-badge.close-wait { border-color: var(--red); color: var(--red); }
-.status-badge.default { border-color: var(--border); color: var(--text-muted); }
+.status-badge.default { border-color: var(--border); color: var(--text-light); }
 
 /* Interfaces */
 .interfaces-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 14px;
 }
 
 .interface-card {
     background: var(--bg-card);
-    border: 2px solid var(--text);
-    padding: 16px;
+    border: 3px solid var(--text);
+    padding: 18px;
 }
 
 .interface-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border);
 }
 
 .interface-name {
     font-weight: 600;
-    font-size: 14px;
+    font-size: 15px;
     color: var(--text);
 }
 
 .interface-status {
-    font-size: 10px;
+    font-size: 11px;
     text-transform: lowercase;
     letter-spacing: 1px;
-    padding: 2px 10px;
+    padding: 3px 12px;
     border: 2px solid;
     font-weight: 600;
 }
@@ -485,7 +486,7 @@ tr:hover td {
 .interface-details {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    gap: 12px;
 }
 
 .interface-detail {
@@ -495,14 +496,14 @@ tr:hover td {
 
 .interface-detail-label {
     color: var(--text-muted);
-    font-size: 10px;
+    font-size: 11px;
     text-transform: lowercase;
     letter-spacing: 0.5px;
-    font-weight: 500;
+    font-weight: 600;
 }
 
 .interface-detail-value {
-    font-size: 13px;
+    font-size: 14px;
     word-break: break-all;
     color: var(--text);
     font-weight: 500;
@@ -511,19 +512,19 @@ tr:hover td {
 /* Scanner */
 .scanner-controls {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     align-items: center;
-    margin-bottom: 16px;
+    margin-bottom: 18px;
 }
 
 .scanner-controls input {
     flex: 1;
-    padding: 8px 12px;
+    padding: 10px 14px;
     border: 2px solid var(--border);
     background: var(--bg-card);
     color: var(--text);
     font-family: inherit;
-    font-size: 12px;
+    font-size: 14px;
     outline: none;
 }
 
@@ -532,21 +533,21 @@ tr:hover td {
 }
 
 .scan-status {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--text-muted);
-    font-weight: 500;
+    font-weight: 600;
 }
 
 .devices-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 14px;
 }
 
 .device-card {
     background: var(--bg-card);
-    border: 2px solid var(--text);
-    padding: 16px;
+    border: 3px solid var(--text);
+    padding: 18px;
     transition: all 0.15s;
 }
 
@@ -555,27 +556,27 @@ tr:hover td {
 }
 
 .device-icon {
-    font-size: 12px;
-    color: var(--text-muted);
+    font-size: 13px;
+    color: var(--text-light);
     margin-bottom: 8px;
     font-family: 'IBM Plex Mono', monospace;
     letter-spacing: 1px;
 }
 
 .device-ip {
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 600;
     margin-bottom: 2px;
     color: var(--text);
 }
 
 .device-mac {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--text-muted);
 }
 
 .device-vendor {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--text-light);
     margin-top: 6px;
 }
@@ -583,12 +584,12 @@ tr:hover td {
 /* Footer */
 .footer {
     text-align: center;
-    padding: 16px;
-    font-size: 11px;
+    padding: 18px;
+    font-size: 12px;
     color: var(--text-muted);
     letter-spacing: 1px;
-    border-top: 2px solid var(--text);
-    margin-top: 24px;
+    border-top: 3px solid var(--text);
+    margin-top: 28px;
 }
 
 /* Responsive */
@@ -602,7 +603,7 @@ tr:hover td {
     .navbar {
         flex-direction: column;
         height: auto;
-        padding: 12px;
+        padding: 14px;
         gap: 10px;
     }
 
