@@ -6,6 +6,10 @@ let ws = null;
 let reconnectTimer = null;
 
 let bwCtx, errCtx, pktCtx, ifaceCtx, connCtx, ifaceCompareCtx;
+let analyticsIfaceBwCtx, analyticsConnTrendCtx, analyticsProtocolCtx;
+let analyticsTopPortsCtx, analyticsRatioCtx, analyticsLatencyCtx;
+let latencyHistory = [];
+let connTrendHistory = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
@@ -42,6 +46,9 @@ function connectWebSocket() {
                 updateBandwidthChart(data.bandwidth);
                 updateErrorsChart(data.bandwidth);
                 updatePacketsChart(data.bandwidth);
+                if (data.connection_count !== undefined) {
+                    updateConnTrend(data.connection_count);
+                }
             }
         } catch (err) {}
     };
@@ -68,6 +75,7 @@ function initTabs() {
             document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
             if (btn.dataset.tab === 'interfaces') loadInterfaces();
             if (btn.dataset.tab === 'connections') loadConnections();
+            if (btn.dataset.tab === 'analytics') loadAnalytics();
             setTimeout(initCharts, 50);
         });
     });
@@ -82,6 +90,12 @@ function initCharts() {
     ifaceCtx = setupCanvas('interface-chart', 220);
     connCtx = setupCanvas('connection-status-chart', 280);
     ifaceCompareCtx = setupCanvas('iface-compare-chart', 260);
+    analyticsIfaceBwCtx = setupCanvas('analytics-iface-bw-chart', 260);
+    analyticsConnTrendCtx = setupCanvas('analytics-conn-trend-chart', 260);
+    analyticsProtocolCtx = setupCanvas('analytics-protocol-chart', 260);
+    analyticsTopPortsCtx = setupCanvas('analytics-top-ports-chart', 260);
+    analyticsRatioCtx = setupCanvas('analytics-ratio-chart', 260);
+    analyticsLatencyCtx = setupCanvas('analytics-latency-chart', 260);
 }
 
 function setupCanvas(id, height) {
@@ -726,6 +740,374 @@ function initScanner() {
             status.style.color = 'var(--red)';
         }
     });
+}
+
+// ==================== ANALYTICS ====================
+
+async function loadAnalytics() {
+    try {
+        const [ifaceBw, connData, latency, ratio] = await Promise.all([
+            fetch(API + '/api/analytics/iface-bandwidth').then(r => r.json()),
+            fetch(API + '/api/analytics/connections').then(r => r.json()),
+            fetch(API + '/api/analytics/latency').then(r => r.json()),
+            fetch(API + '/api/analytics/traffic-ratio').then(r => r.json()),
+        ]);
+
+        setTimeout(() => {
+            initCharts();
+            drawIfaceBwChart(ifaceBw);
+            drawProtocolChart(connData);
+            drawTopPortsChart(connData);
+            drawRatioChart(ratio);
+        }, 100);
+
+        updateConnTrend(connData.total);
+        drawLatencyChart(latency);
+    } catch (e) {
+        console.error('Analytics load error:', e);
+    }
+}
+
+// 1) Bandwidth per interface (grouped bar)
+function drawIfaceBwChart(ifaces) {
+    const { w, h } = getCanvasSize('analytics-iface-bw-chart');
+    if (!analyticsIfaceBwCtx || w === 0) return;
+
+    analyticsIfaceBwCtx.clearRect(0, 0, w, h);
+    const active = ifaces.filter(i => i.up);
+
+    if (active.length === 0) {
+        analyticsIfaceBwCtx.font = FONT;
+        analyticsIfaceBwCtx.fillStyle = COL_LIGHT;
+        analyticsIfaceBwCtx.fillText('no active interfaces', 60, h / 2);
+        return;
+    }
+
+    const left = 60, top = 30, bot = 50, right = 20;
+    const cw = w - left - right;
+    const ch = h - top - bot;
+    const maxVal = Math.max(...active.map(i => Math.max(i.sent, i.recv)), 1024);
+
+    drawGrid(analyticsIfaceBwCtx, w, h, 5, top, bot);
+    drawYLabels(analyticsIfaceBwCtx, h, maxVal, 5, top, bot);
+
+    const groupW = cw / active.length;
+    const barW = Math.min(groupW * 0.3, 35);
+    const gap = 6;
+
+    active.forEach((iface, i) => {
+        const gx = left + i * groupW + groupW / 2;
+
+        const sentH = (iface.sent / maxVal) * ch;
+        analyticsIfaceBwCtx.fillStyle = COL_BLUE;
+        analyticsIfaceBwCtx.fillRect(gx - barW - gap / 2, h - bot - sentH, barW, sentH);
+
+        const recvH = (iface.recv / maxVal) * ch;
+        analyticsIfaceBwCtx.fillStyle = COL_GREEN;
+        analyticsIfaceBwCtx.fillRect(gx + gap / 2, h - bot - recvH, barW, recvH);
+
+        analyticsIfaceBwCtx.font = FONT_SM;
+        analyticsIfaceBwCtx.textAlign = 'center';
+        analyticsIfaceBwCtx.fillStyle = COL_BLUE;
+        if (sentH > 15) analyticsIfaceBwCtx.fillText(formatBytesShort(iface.sent), gx - barW / 2 - gap / 2, h - bot - sentH - 6);
+        analyticsIfaceBwCtx.fillStyle = COL_GREEN;
+        if (recvH > 15) analyticsIfaceBwCtx.fillText(formatBytesShort(iface.recv), gx + barW / 2 + gap / 2, h - bot - recvH - 6);
+
+        analyticsIfaceBwCtx.fillStyle = COL_MUTED;
+        const name = iface.name.length > 10 ? iface.name.substring(0, 8) + '..' : iface.name;
+        analyticsIfaceBwCtx.fillText(name, gx, h - 14);
+    });
+
+    analyticsIfaceBwCtx.textAlign = 'left';
+    drawLegend(analyticsIfaceBwCtx, [
+        { color: COL_BLUE, label: 'sent' },
+        { color: COL_GREEN, label: 'recv' }
+    ], left, 16);
+}
+
+// 2) Connection count trend (line)
+function updateConnTrend(total) {
+    connTrendHistory.push(total);
+    if (connTrendHistory.length > 60) connTrendHistory.shift();
+
+    const { w, h } = getCanvasSize('analytics-conn-trend-chart');
+    if (!analyticsConnTrendCtx || w === 0) return;
+
+    analyticsConnTrendCtx.clearRect(0, 0, w, h);
+    const top = 35, bot = 10;
+    drawGrid(analyticsConnTrendCtx, w, h, 5, top, bot);
+
+    const maxVal = Math.max(...connTrendHistory, 10);
+    drawYLabels(analyticsConnTrendCtx, h, maxVal, 5, top, bot, formatNumber);
+
+    const left = 55;
+    const cw = w - left - 10;
+    const step = cw / (connTrendHistory.length - 1 || 1);
+
+    // Fill
+    analyticsConnTrendCtx.beginPath();
+    analyticsConnTrendCtx.fillStyle = 'rgba(0, 85, 204, 0.08)';
+    connTrendHistory.forEach((v, i) => {
+        const x = left + i * step;
+        const y = h - bot - (v / maxVal) * (h - top - bot);
+        i === 0 ? analyticsConnTrendCtx.moveTo(x, y) : analyticsConnTrendCtx.lineTo(x, y);
+    });
+    analyticsConnTrendCtx.lineTo(left + (connTrendHistory.length - 1) * step, h - bot);
+    analyticsConnTrendCtx.lineTo(left, h - bot);
+    analyticsConnTrendCtx.fill();
+
+    // Line
+    analyticsConnTrendCtx.beginPath();
+    analyticsConnTrendCtx.strokeStyle = COL_BLUE;
+    analyticsConnTrendCtx.lineWidth = 2.5;
+    connTrendHistory.forEach((v, i) => {
+        const x = left + i * step;
+        const y = h - bot - (v / maxVal) * (h - top - bot);
+        i === 0 ? analyticsConnTrendCtx.moveTo(x, y) : analyticsConnTrendCtx.lineTo(x, y);
+    });
+    analyticsConnTrendCtx.stroke();
+
+    // Current value
+    analyticsConnTrendCtx.font = FONT_LG;
+    analyticsConnTrendCtx.fillStyle = COL_TEXT;
+    analyticsConnTrendCtx.fillText('current: ' + connTrendHistory[connTrendHistory.length - 1], left, 22);
+}
+
+// 3) Protocol distribution (pie)
+function drawProtocolChart(connData) {
+    const { w, h } = getCanvasSize('analytics-protocol-chart');
+    if (!analyticsProtocolCtx || w === 0) return;
+
+    analyticsProtocolCtx.clearRect(0, 0, w, h);
+
+    const types = connData.by_type;
+    const total = types.tcp + types.udp;
+
+    if (total === 0) {
+        analyticsProtocolCtx.font = FONT;
+        analyticsProtocolCtx.fillStyle = COL_LIGHT;
+        analyticsProtocolCtx.fillText('no connections', 60, h / 2);
+        return;
+    }
+
+    const r = Math.min(w * 0.3, h * 0.38);
+    const cx = r + 50;
+    const cy = h / 2;
+
+    const slices = [
+        { label: 'tcp', value: types.tcp, color: COL_BLUE },
+        { label: 'udp', value: types.udp, color: COL_GREEN },
+    ];
+
+    let angle = -Math.PI / 2;
+    slices.forEach(s => {
+        const slice = (s.value / total) * Math.PI * 2;
+        analyticsProtocolCtx.beginPath();
+        analyticsProtocolCtx.moveTo(cx, cy);
+        analyticsProtocolCtx.arc(cx, cy, r, angle, angle + slice);
+        analyticsProtocolCtx.closePath();
+        analyticsProtocolCtx.fillStyle = s.color;
+        analyticsProtocolCtx.fill();
+        analyticsProtocolCtx.strokeStyle = '#ffffff';
+        analyticsProtocolCtx.lineWidth = 3;
+        analyticsProtocolCtx.stroke();
+        angle += slice;
+    });
+
+    // Center
+    analyticsProtocolCtx.font = 'bold 18px IBM Plex Mono, Courier New, monospace';
+    analyticsProtocolCtx.fillStyle = COL_TEXT;
+    analyticsProtocolCtx.textAlign = 'center';
+    analyticsProtocolCtx.fillText(total, cx, cy);
+    analyticsProtocolCtx.font = FONT_SM;
+    analyticsProtocolCtx.fillStyle = COL_MUTED;
+    analyticsProtocolCtx.fillText('total', cx, cy + 18);
+    analyticsProtocolCtx.textAlign = 'left';
+
+    // Legend
+    const lx = cx + r + 30;
+    let ly = h / 2 - 20;
+    analyticsProtocolCtx.font = FONT;
+    slices.forEach(s => {
+        const pct = ((s.value / total) * 100).toFixed(1);
+        analyticsProtocolCtx.fillStyle = s.color;
+        analyticsProtocolCtx.fillRect(lx, ly - 4, 16, 16);
+        analyticsProtocolCtx.fillStyle = COL_TEXT;
+        analyticsProtocolCtx.fillText(s.label + ' (' + pct + '%)', lx + 24, ly + 10);
+        analyticsProtocolCtx.fillStyle = COL_MUTED;
+        analyticsProtocolCtx.fillText(s.value + ' connections', lx + 24, ly + 28);
+        ly += 50;
+    });
+}
+
+// 4) Top ports by connections (horizontal bar)
+function drawTopPortsChart(connData) {
+    const { w, h } = getCanvasSize('analytics-top-ports-chart');
+    if (!analyticsTopPortsCtx || w === 0) return;
+
+    analyticsTopPortsCtx.clearRect(0, 0, w, h);
+
+    const ports = connData.top_ports.slice(0, 8);
+    if (ports.length === 0) {
+        analyticsTopPortsCtx.font = FONT;
+        analyticsTopPortsCtx.fillStyle = COL_LIGHT;
+        analyticsTopPortsCtx.fillText('no ports', 60, h / 2);
+        return;
+    }
+
+    const maxCount = Math.max(...ports.map(p => p.count), 1);
+    const left = 60, top = 10, bot = 10, right = 20;
+    const ch = h - top - bot;
+    const barH = Math.min(24, (ch / ports.length) - 6);
+    const gap = (ch - barH * ports.length) / (ports.length + 1);
+
+    ports.forEach((port, i) => {
+        const y = top + gap + i * (barH + gap);
+        const barW = (port.count / maxCount) * (w - left - right);
+
+        analyticsTopPortsCtx.fillStyle = COL_BLUE;
+        analyticsTopPortsCtx.fillRect(left, y, Math.max(barW, 3), barH);
+
+        analyticsTopPortsCtx.font = FONT_SM;
+        analyticsTopPortsCtx.fillStyle = COL_TEXT;
+        analyticsTopPortsCtx.textAlign = 'right';
+        analyticsTopPortsCtx.fillText(':' + port.port, left - 6, y + barH / 2 + 4);
+        analyticsTopPortsCtx.textAlign = 'left';
+
+        analyticsTopPortsCtx.fillStyle = COL_MUTED;
+        analyticsTopPortsCtx.fillText(port.count, left + Math.max(barW, 3) + 6, y + barH / 2 + 4);
+    });
+}
+
+// 5) Sent vs Received ratio (donut)
+function drawRatioChart(ratio) {
+    const { w, h } = getCanvasSize('analytics-ratio-chart');
+    if (!analyticsRatioCtx || w === 0) return;
+
+    analyticsRatioCtx.clearRect(0, 0, w, h);
+
+    const total = ratio.sent + ratio.recv;
+    if (total === 0) {
+        analyticsRatioCtx.font = FONT;
+        analyticsRatioCtx.fillStyle = COL_LIGHT;
+        analyticsRatioCtx.fillText('no traffic', 60, h / 2);
+        return;
+    }
+
+    const r = Math.min(w * 0.28, h * 0.38);
+    const inner = r * 0.55;
+    const cx = r + 50;
+    const cy = h / 2;
+
+    const sentPct = ratio.sent / total;
+    const recvPct = ratio.recv / total;
+
+    // Sent arc
+    analyticsRatioCtx.beginPath();
+    analyticsRatioCtx.moveTo(cx, cy);
+    analyticsRatioCtx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + sentPct * Math.PI * 2);
+    analyticsRatioCtx.closePath();
+    analyticsRatioCtx.fillStyle = COL_BLUE;
+    analyticsRatioCtx.fill();
+
+    // Recv arc
+    analyticsRatioCtx.beginPath();
+    analyticsRatioCtx.moveTo(cx, cy);
+    analyticsRatioCtx.arc(cx, cy, r, -Math.PI / 2 + sentPct * Math.PI * 2, -Math.PI / 2 + Math.PI * 2);
+    analyticsRatioCtx.closePath();
+    analyticsRatioCtx.fillStyle = COL_GREEN;
+    analyticsRatioCtx.fill();
+
+    // Inner circle (donut hole)
+    analyticsRatioCtx.beginPath();
+    analyticsRatioCtx.arc(cx, cy, inner, 0, Math.PI * 2);
+    analyticsRatioCtx.fillStyle = '#ffffff';
+    analyticsRatioCtx.fill();
+
+    // Center text
+    analyticsRatioCtx.font = 'bold 14px IBM Plex Mono, Courier New, monospace';
+    analyticsRatioCtx.fillStyle = COL_TEXT;
+    analyticsRatioCtx.textAlign = 'center';
+    analyticsRatioCtx.fillText((sentPct * 100).toFixed(0) + '%', cx, cy - 2);
+    analyticsRatioCtx.font = FONT_SM;
+    analyticsRatioCtx.fillStyle = COL_MUTED;
+    analyticsRatioCtx.fillText('sent', cx, cy + 14);
+    analyticsRatioCtx.textAlign = 'left';
+
+    // Legend
+    const lx = cx + r + 30;
+    let ly = h / 2 - 30;
+    analyticsRatioCtx.font = FONT;
+
+    analyticsRatioCtx.fillStyle = COL_BLUE;
+    analyticsRatioCtx.fillRect(lx, ly - 4, 16, 16);
+    analyticsRatioCtx.fillStyle = COL_TEXT;
+    analyticsRatioCtx.fillText('sent: ' + formatBytes(ratio.sent), lx + 24, ly + 10);
+    ly += 36;
+
+    analyticsRatioCtx.fillStyle = COL_GREEN;
+    analyticsRatioCtx.fillRect(lx, ly - 4, 16, 16);
+    analyticsRatioCtx.fillStyle = COL_TEXT;
+    analyticsRatioCtx.fillText('recv: ' + formatBytes(ratio.recv), lx + 24, ly + 10);
+}
+
+// 6) Ping latency history (line)
+function drawLatencyChart(targets) {
+    targets.forEach(t => {
+        latencyHistory.push({ host: t.host, latency: t.latency });
+    });
+    if (latencyHistory.length > 18) latencyHistory.splice(0, 3);
+
+    const { w, h } = getCanvasSize('analytics-latency-chart');
+    if (!analyticsLatencyCtx || w === 0) return;
+
+    analyticsLatencyCtx.clearRect(0, 0, w, h);
+    const top = 35, bot = 10;
+    drawGrid(analyticsLatencyCtx, w, h, 5, top, bot);
+
+    const validLatencies = latencyHistory.map(l => l.latency).filter(l => l >= 0);
+    const maxVal = Math.max(...validLatencies, 10);
+    drawYLabels(analyticsLatencyCtx, h, maxVal, 5, top, bot, v => v.toFixed(0) + 'ms');
+
+    const left = 55;
+    const cw = w - left - 10;
+    const step = cw / (latencyHistory.length - 1 || 1);
+
+    // Group by host
+    const hosts = [...new Set(latencyHistory.map(l => l.host))];
+    const hostColors = { '8.8.8.8': COL_BLUE, '1.1.1.1': COL_GREEN, '8.8.4.4': '#cc6600' };
+
+    hosts.forEach(host => {
+        const points = latencyHistory.filter(l => l.host === host);
+        const color = hostColors[host] || COL_MUTED;
+
+        analyticsLatencyCtx.beginPath();
+        analyticsLatencyCtx.strokeStyle = color;
+        analyticsLatencyCtx.lineWidth = 2;
+        let started = false;
+        points.forEach(p => {
+            const idx = latencyHistory.indexOf(p);
+            const x = left + idx * step;
+            const y = h - bot - (Math.max(p.latency, 0) / maxVal) * (h - top - bot);
+            if (!started) { analyticsLatencyCtx.moveTo(x, y); started = true; }
+            else analyticsLatencyCtx.lineTo(x, y);
+        });
+        analyticsLatencyCtx.stroke();
+
+        // Dots
+        points.forEach(p => {
+            const idx = latencyHistory.indexOf(p);
+            const x = left + idx * step;
+            const y = h - bot - (Math.max(p.latency, 0) / maxVal) * (h - top - bot);
+            analyticsLatencyCtx.beginPath();
+            analyticsLatencyCtx.arc(x, y, 3, 0, Math.PI * 2);
+            analyticsLatencyCtx.fillStyle = color;
+            analyticsLatencyCtx.fill();
+        });
+    });
+
+    // Legend
+    drawLegend(analyticsLatencyCtx, hosts.map(h => ({ color: hostColors[h] || COL_MUTED, label: h })), left, 16);
 }
 
 // ==================== UTILS ====================

@@ -32,6 +32,7 @@ def broadcast_data():
                     "active_interfaces": active_ifaces,
                     "total_interfaces": len(interfaces),
                     "listening_ports": len(listening),
+                    "connection_count": len(monitor.get_connections()),
                     "timestamp": time.time(),
                 })
 
@@ -146,6 +147,65 @@ def api_summary():
         "wifi": wifi,
         "timestamp": time.time(),
     })
+
+
+@app.route("/api/analytics/iface-bandwidth")
+def api_analytics_iface_bandwidth():
+    interfaces = monitor.get_interface_info()
+    return jsonify([{
+        "name": i["name"],
+        "sent": i["bytes_sent"],
+        "recv": i["bytes_recv"],
+        "up": i["is_up"]
+    } for i in interfaces])
+
+
+@app.route("/api/analytics/connections")
+def api_analytics_connections():
+    connections = monitor.get_connections()
+    status_counts = {}
+    type_counts = {"tcp": 0, "udp": 0}
+    port_counts = {}
+
+    for c in connections:
+        s = c["status"]
+        status_counts[s] = status_counts.get(s, 0) + 1
+
+        if "SOCK_STREAM" in c["type"]:
+            type_counts["tcp"] += 1
+        else:
+            type_counts["udp"] += 1
+
+        if c["laddr"]:
+            port = c["laddr"].split(":")[-1]
+            port_counts[port] = port_counts.get(port, 0) + 1
+
+    top_ports = sorted(port_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+
+    return jsonify({
+        "total": len(connections),
+        "by_status": status_counts,
+        "by_type": type_counts,
+        "top_ports": [{"port": p, "count": c} for p, c in top_ports],
+    })
+
+
+@app.route("/api/analytics/latency")
+def api_analytics_latency():
+    targets = ["8.8.8.8", "1.1.1.1", "8.8.4.4"]
+    results = []
+    for t in targets:
+        r = monitor.ping_host(t)
+        results.append({"host": t, "latency": r.get("latency", -1), "status": r.get("status", "error")})
+    return jsonify(results)
+
+
+@app.route("/api/analytics/traffic-ratio")
+def api_analytics_traffic_ratio():
+    interfaces = monitor.get_interface_info()
+    total_sent = sum(i["bytes_sent"] for i in interfaces)
+    total_recv = sum(i["bytes_recv"] for i in interfaces)
+    return jsonify({"sent": total_sent, "recv": total_recv})
 
 
 @sock.route("/ws")

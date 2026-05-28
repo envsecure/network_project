@@ -17,6 +17,7 @@
             <button class="nav-btn" data-tab="interfaces">interfaces</button>
             <button class="nav-btn" data-tab="connections">connections</button>
             <button class="nav-btn" data-tab="scanner">scanner</button>
+            <button class="nav-btn" data-tab="analytics">analytics</button>
         </div>
         <div class="nav-status">
             <span id="auto-refresh-status" class="status-dot green"></span>
@@ -210,6 +211,47 @@
                 <span id="scan-status" class="scan-status"></span>
             </div>
             <div class="devices-grid" id="devices-grid"></div>
+        </section>
+
+        <!-- Analytics Tab -->
+        <section id="tab-analytics" class="tab-content">
+            <div class="card-header">advanced_analytics</div>
+
+            <!-- Row 1: Bandwidth per interface + Connection trend -->
+            <div class="charts-row">
+                <div class="chart-card">
+                    <div class="card-header">bandwidth_per_interface</div>
+                    <canvas id="analytics-iface-bw-chart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="card-header">connection_count_trend</div>
+                    <canvas id="analytics-conn-trend-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Row 2: Protocol distribution + Top ports -->
+            <div class="charts-row">
+                <div class="chart-card" style="min-height: 300px;">
+                    <div class="card-header">protocol_distribution</div>
+                    <canvas id="analytics-protocol-chart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="card-header">top_ports_by_connections</div>
+                    <canvas id="analytics-top-ports-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Row 3: Traffic ratio + Latency history -->
+            <div class="charts-row">
+                <div class="chart-card" style="min-height: 300px;">
+                    <div class="card-header">sent_vs_received_ratio</div>
+                    <canvas id="analytics-ratio-chart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="card-header">ping_latency_history</div>
+                    <canvas id="analytics-latency-chart"></canvas>
+                </div>
+            </div>
         </section>
     </main>
 
