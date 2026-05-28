@@ -190,16 +190,6 @@ def api_analytics_connections():
     })
 
 
-@app.route("/api/analytics/latency")
-def api_analytics_latency():
-    targets = ["8.8.8.8", "1.1.1.1", "8.8.4.4"]
-    results = []
-    for t in targets:
-        r = monitor.ping_host(t)
-        results.append({"host": t, "latency": r.get("latency", -1), "status": r.get("status", "error")})
-    return jsonify(results)
-
-
 @app.route("/api/analytics/traffic-ratio")
 def api_analytics_traffic_ratio():
     interfaces = monitor.get_interface_info()

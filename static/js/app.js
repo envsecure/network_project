@@ -7,8 +7,7 @@ let reconnectTimer = null;
 
 let bwCtx, errCtx, pktCtx, ifaceCtx, connCtx, ifaceCompareCtx, dashTopPortsCtx;
 let analyticsIfaceBwCtx, analyticsConnTrendCtx, analyticsProtocolCtx;
-let analyticsTopPortsCtx, analyticsRatioCtx, analyticsLatencyCtx;
-let latencyHistory = [];
+let analyticsTopPortsCtx, analyticsRatioCtx;
 let connTrendHistory = [];
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -96,7 +95,6 @@ function initCharts() {
     analyticsProtocolCtx = setupCanvas('analytics-protocol-chart', 260);
     analyticsTopPortsCtx = setupCanvas('analytics-top-ports-chart', 260);
     analyticsRatioCtx = setupCanvas('analytics-ratio-chart', 260);
-    analyticsLatencyCtx = setupCanvas('analytics-latency-chart', 260);
 }
 
 function setupCanvas(id, height) {
@@ -788,10 +786,9 @@ function initScanner() {
 
 async function loadAnalytics() {
     try {
-        const [ifaceBw, connData, latency, ratio] = await Promise.all([
+        const [ifaceBw, connData, ratio] = await Promise.all([
             fetch(API + '/api/analytics/iface-bandwidth').then(r => r.json()),
             fetch(API + '/api/analytics/connections').then(r => r.json()),
-            fetch(API + '/api/analytics/latency').then(r => r.json()),
             fetch(API + '/api/analytics/traffic-ratio').then(r => r.json()),
         ]);
 
@@ -801,7 +798,6 @@ async function loadAnalytics() {
             drawProtocolChart(connData);
             drawTopPortsChart(connData);
             drawRatioChart(ratio);
-            drawLatencyChart(latency);
         }, 100);
 
         updateConnTrend(connData.total);
@@ -1094,64 +1090,6 @@ function drawRatioChart(ratio) {
 }
 
 // 6) Ping latency history (line)
-function drawLatencyChart(targets) {
-    targets.forEach(t => {
-        latencyHistory.push({ host: t.host, latency: t.latency });
-    });
-    if (latencyHistory.length > 18) latencyHistory.splice(0, 3);
-
-    const { w, h } = getCanvasSize('analytics-latency-chart');
-    if (!analyticsLatencyCtx || w === 0) return;
-
-    analyticsLatencyCtx.clearRect(0, 0, w, h);
-    const top = 35, bot = 10;
-    drawGrid(analyticsLatencyCtx, w, h, 5, top, bot);
-
-    const validLatencies = latencyHistory.map(l => l.latency).filter(l => l >= 0);
-    const maxVal = Math.max(...validLatencies, 10);
-    drawYLabels(analyticsLatencyCtx, h, maxVal, 5, top, bot, v => v.toFixed(0) + 'ms');
-
-    const left = 55;
-    const cw = w - left - 10;
-    const step = cw / (latencyHistory.length - 1 || 1);
-
-    // Group by host
-    const hosts = [...new Set(latencyHistory.map(l => l.host))];
-    const hostColors = { '8.8.8.8': COL_BLUE, '1.1.1.1': COL_GREEN, '8.8.4.4': '#cc6600' };
-
-    hosts.forEach(host => {
-        const points = latencyHistory.filter(l => l.host === host);
-        const color = hostColors[host] || COL_MUTED;
-
-        analyticsLatencyCtx.beginPath();
-        analyticsLatencyCtx.strokeStyle = color;
-        analyticsLatencyCtx.lineWidth = 2;
-        let started = false;
-        points.forEach(p => {
-            const idx = latencyHistory.indexOf(p);
-            const x = left + idx * step;
-            const y = h - bot - (Math.max(p.latency, 0) / maxVal) * (h - top - bot);
-            if (!started) { analyticsLatencyCtx.moveTo(x, y); started = true; }
-            else analyticsLatencyCtx.lineTo(x, y);
-        });
-        analyticsLatencyCtx.stroke();
-
-        // Dots
-        points.forEach(p => {
-            const idx = latencyHistory.indexOf(p);
-            const x = left + idx * step;
-            const y = h - bot - (Math.max(p.latency, 0) / maxVal) * (h - top - bot);
-            analyticsLatencyCtx.beginPath();
-            analyticsLatencyCtx.arc(x, y, 3, 0, Math.PI * 2);
-            analyticsLatencyCtx.fillStyle = color;
-            analyticsLatencyCtx.fill();
-        });
-    });
-
-    // Legend
-    drawLegend(analyticsLatencyCtx, hosts.map(h => ({ color: hostColors[h] || COL_MUTED, label: h })), left, 16);
-}
-
 // ==================== UTILS ====================
 
 function formatBytes(bytes) {
