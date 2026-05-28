@@ -3,24 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Network Health Monitor</title>
+    <title>NetMon // Network Health Monitor</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <nav class="navbar">
         <div class="nav-brand">
-            <span class="logo">&#9881;</span>
-            NetMonitor
+            <span class="logo">[</span>NetMonitor<span class="logo">]</span>
+            <span class="nav-version">v1.0</span>
         </div>
         <div class="nav-links">
-            <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
-            <button class="nav-btn" data-tab="interfaces">Interfaces</button>
-            <button class="nav-btn" data-tab="connections">Connections</button>
-            <button class="nav-btn" data-tab="scanner">Device Scanner</button>
+            <button class="nav-btn active" data-tab="dashboard">dashboard</button>
+            <button class="nav-btn" data-tab="interfaces">interfaces</button>
+            <button class="nav-btn" data-tab="connections">connections</button>
+            <button class="nav-btn" data-tab="scanner">scanner</button>
         </div>
         <div class="nav-status">
             <span id="auto-refresh-status" class="status-dot green"></span>
-            Live
+            <span class="status-text">live</span>
         </div>
     </nav>
 
@@ -37,77 +37,66 @@
                         <span class="score-text" id="score-text">--</span>
                     </div>
                     <div class="health-info">
-                        <h2 id="health-status">Loading...</h2>
+                        <h2 id="health-status">loading...</h2>
                         <p id="health-issues"></p>
                     </div>
                 </div>
                 <div class="health-meta">
-                    <span id="gateway-display">Gateway: --</span>
-                    <span id="dns-display">DNS: --</span>
+                    <span id="gateway-display">gw: --</span>
+                    <span class="meta-sep">//</span>
+                    <span id="dns-display">dns: --</span>
                 </div>
             </div>
 
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-icon upload">&#8593;</div>
-                    <div class="stat-info">
-                        <span class="stat-label">Upload Speed</span>
-                        <span class="stat-value" id="upload-speed">0 B/s</span>
-                    </div>
+                    <div class="stat-label">upload</div>
+                    <div class="stat-value" id="upload-speed">0 B/s</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon download">&#8595;</div>
-                    <div class="stat-info">
-                        <span class="stat-label">Download Speed</span>
-                        <span class="stat-value" id="download-speed">0 B/s</span>
-                    </div>
+                    <div class="stat-label">download</div>
+                    <div class="stat-value" id="download-speed">0 B/s</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon ports">&#9881;</div>
-                    <div class="stat-info">
-                        <span class="stat-label">Open Ports</span>
-                        <span class="stat-value" id="open-ports">0</span>
-                    </div>
+                    <div class="stat-label">open ports</div>
+                    <div class="stat-value" id="open-ports">0</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon devices">&#9742;</div>
-                    <div class="stat-info">
-                        <span class="stat-label">Active Interfaces</span>
-                        <span class="stat-value" id="active-interfaces">0/0</span>
-                    </div>
+                    <div class="stat-label">interfaces</div>
+                    <div class="stat-value" id="active-interfaces">0/0</div>
                 </div>
             </div>
 
             <div class="charts-row">
                 <div class="chart-card">
-                    <h3>Bandwidth Over Time</h3>
+                    <div class="card-header">bandwidth_over_time</div>
                     <canvas id="bandwidth-chart"></canvas>
                 </div>
                 <div class="chart-card">
-                    <h3>Total Traffic</h3>
+                    <div class="card-header">traffic_totals</div>
                     <div class="traffic-stats">
                         <div class="traffic-item">
-                            <span class="traffic-label">Total Sent</span>
+                            <span class="traffic-label">sent</span>
                             <span class="traffic-value" id="total-sent">0 B</span>
                         </div>
                         <div class="traffic-item">
-                            <span class="traffic-label">Total Received</span>
+                            <span class="traffic-label">recv</span>
                             <span class="traffic-value" id="total-recv">0 B</span>
                         </div>
                         <div class="traffic-item">
-                            <span class="traffic-label">Packets Sent</span>
+                            <span class="traffic-label">pkt_sent</span>
                             <span class="traffic-value" id="packets-sent">0</span>
                         </div>
                         <div class="traffic-item">
-                            <span class="traffic-label">Packets Received</span>
+                            <span class="traffic-label">pkt_recv</span>
                             <span class="traffic-value" id="packets-recv">0</span>
                         </div>
                         <div class="traffic-item error">
-                            <span class="traffic-label">Errors</span>
+                            <span class="traffic-label">errors</span>
                             <span class="traffic-value" id="errors">0</span>
                         </div>
                         <div class="traffic-item error">
-                            <span class="traffic-label">Drops</span>
+                            <span class="traffic-label">drops</span>
                             <span class="traffic-value" id="drops">0</span>
                         </div>
                     </div>
@@ -115,24 +104,24 @@
             </div>
 
             <div class="ping-section">
-                <h3>Quick Ping Test</h3>
+                <div class="card-header">ping_test</div>
                 <div class="ping-form">
-                    <input type="text" id="ping-host" placeholder="Host (e.g. 8.8.8.8)" value="8.8.8.8">
-                    <button id="ping-btn" class="btn btn-primary">Ping</button>
+                    <input type="text" id="ping-host" placeholder="8.8.8.8" value="8.8.8.8">
+                    <button id="ping-btn" class="btn">run</button>
                 </div>
                 <div id="ping-result" class="ping-result"></div>
             </div>
 
             <div class="listening-section">
-                <h3>Listening Ports</h3>
+                <div class="card-header">listening_ports</div>
                 <div class="table-wrapper">
                     <table id="listening-table">
                         <thead>
                             <tr>
-                                <th>Port</th>
-                                <th>Address</th>
-                                <th>Process</th>
-                                <th>PID</th>
+                                <th>port</th>
+                                <th>address</th>
+                                <th>process</th>
+                                <th>pid</th>
                             </tr>
                         </thead>
                         <tbody id="listening-tbody"></tbody>
@@ -143,22 +132,22 @@
 
         <!-- Interfaces Tab -->
         <section id="tab-interfaces" class="tab-content">
-            <h2>Network Interfaces</h2>
+            <div class="card-header">network_interfaces</div>
             <div id="interfaces-list" class="interfaces-grid"></div>
         </section>
 
         <!-- Connections Tab -->
         <section id="tab-connections" class="tab-content">
-            <h2>Active Connections</h2>
+            <div class="card-header">active_connections</div>
             <div class="table-wrapper">
                 <table id="connections-table">
                     <thead>
                         <tr>
-                            <th>Local Address</th>
-                            <th>Remote Address</th>
-                            <th>Status</th>
-                            <th>Type</th>
-                            <th>PID</th>
+                            <th>local</th>
+                            <th>remote</th>
+                            <th>status</th>
+                            <th>type</th>
+                            <th>pid</th>
                         </tr>
                     </thead>
                     <tbody id="connections-tbody"></tbody>
@@ -168,15 +157,19 @@
 
         <!-- Scanner Tab -->
         <section id="tab-scanner" class="tab-content">
-            <h2>Network Device Scanner</h2>
+            <div class="card-header">device_scanner</div>
             <div class="scanner-controls">
-                <input type="text" id="scan-subnet" placeholder="Subnet (e.g. 192.168.1.0/24) - leave empty for auto">
-                <button id="scan-btn" class="btn btn-primary">Scan Network</button>
+                <input type="text" id="scan-subnet" placeholder="192.168.1.0/24 (leave empty for auto)">
+                <button id="scan-btn" class="btn">scan</button>
                 <span id="scan-status" class="scan-status"></span>
             </div>
             <div class="devices-grid" id="devices-grid"></div>
         </section>
     </main>
+
+    <footer class="footer">
+        <span>netmonitor v1.0 // localhost:5000</span>
+    </footer>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>

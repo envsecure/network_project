@@ -30,7 +30,7 @@ function initChart() {
     const canvas = document.getElementById('bandwidth-chart');
     chartCtx = canvas.getContext('2d');
     canvas.width = canvas.offsetWidth;
-    canvas.height = 200;
+    canvas.height = 180;
 }
 
 function startAutoRefresh() {
@@ -69,15 +69,14 @@ function updateHealth(health) {
 
     let color = 'var(--green)';
     if (score < 40) color = 'var(--red)';
-    else if (score < 60) color = 'var(--orange)';
-    else if (score < 80) color = 'var(--yellow)';
+    else if (score < 60) color = 'var(--yellow)';
     scoreFill.style.stroke = color;
 
-    healthStatus.textContent = health.status.charAt(0).toUpperCase() + health.status.slice(1) + ' Network';
-    healthIssues.textContent = health.issues.length > 0 ? health.issues.join(' | ') : 'No issues detected';
+    healthStatus.textContent = health.status;
+    healthIssues.textContent = health.issues.length > 0 ? health.issues.join(' // ') : 'no issues';
 
-    gatewayDisplay.textContent = 'Gateway: ' + (health.gateway || 'N/A');
-    dnsDisplay.textContent = 'DNS: ' + (health.dns_servers.length > 0 ? health.dns_servers[0] : 'N/A');
+    gatewayDisplay.textContent = 'gw: ' + (health.gateway || 'none');
+    dnsDisplay.textContent = 'dns: ' + (health.dns_servers.length > 0 ? health.dns_servers[0] : 'none');
 }
 
 function updateBandwidth(bw) {
@@ -100,7 +99,7 @@ function updateListeningPorts(ports) {
     const tbody = document.getElementById('listening-tbody');
     tbody.innerHTML = ports.map(p => `
         <tr>
-            <td><strong>${p.port}</strong></td>
+            <td>${p.port}</td>
             <td>${p.address}</td>
             <td>${p.process}</td>
             <td>${p.pid || '-'}</td>
@@ -124,6 +123,17 @@ function updateBandwidthChart(bw) {
 
     chartCtx.clearRect(0, 0, w, h);
 
+    // Grid lines
+    chartCtx.strokeStyle = '#e8e8e8';
+    chartCtx.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
+        const y = (h / 5) * i + 10;
+        chartCtx.beginPath();
+        chartCtx.moveTo(0, y);
+        chartCtx.lineTo(w, y);
+        chartCtx.stroke();
+    }
+
     const maxVal = Math.max(
         ...bandwidthHistory.map(d => d.up),
         ...bandwidthHistory.map(d => d.down),
@@ -134,49 +144,48 @@ function updateBandwidthChart(bw) {
 
     // Download line
     chartCtx.beginPath();
-    chartCtx.strokeStyle = '#3b82f6';
-    chartCtx.lineWidth = 2;
+    chartCtx.strokeStyle = '#1a1a1a';
+    chartCtx.lineWidth = 1.5;
     bandwidthHistory.forEach((d, i) => {
         const x = i * step;
-        const y = h - (d.down / maxVal) * (h - 20) - 10;
+        const y = h - (d.down / maxVal) * (h - 30) - 15;
         i === 0 ? chartCtx.moveTo(x, y) : chartCtx.lineTo(x, y);
     });
     chartCtx.stroke();
 
-    // Download fill
-    chartCtx.beginPath();
-    chartCtx.fillStyle = 'rgba(59, 130, 246, 0.1)';
+    // Download dots
     bandwidthHistory.forEach((d, i) => {
-        const x = i * step;
-        const y = h - (d.down / maxVal) * (h - 20) - 10;
-        i === 0 ? chartCtx.moveTo(x, y) : chartCtx.lineTo(x, y);
+        if (i % 5 === 0 || i === bandwidthHistory.length - 1) {
+            const x = i * step;
+            const y = h - (d.down / maxVal) * (h - 30) - 15;
+            chartCtx.fillStyle = '#1a1a1a';
+            chartCtx.fillRect(x - 2, y - 2, 4, 4);
+        }
     });
-    chartCtx.lineTo(w, h);
-    chartCtx.lineTo(0, h);
-    chartCtx.fill();
 
     // Upload line
     chartCtx.beginPath();
-    chartCtx.strokeStyle = '#22c55e';
-    chartCtx.lineWidth = 2;
+    chartCtx.strokeStyle = '#888888';
+    chartCtx.lineWidth = 1;
+    chartCtx.setLineDash([4, 4]);
     bandwidthHistory.forEach((d, i) => {
         const x = i * step;
-        const y = h - (d.up / maxVal) * (h - 20) - 10;
+        const y = h - (d.up / maxVal) * (h - 30) - 15;
         i === 0 ? chartCtx.moveTo(x, y) : chartCtx.lineTo(x, y);
     });
     chartCtx.stroke();
+    chartCtx.setLineDash([]);
 
     // Legend
-    chartCtx.font = '12px Segoe UI';
-    chartCtx.fillStyle = '#3b82f6';
-    chartCtx.fillRect(10, 10, 12, 3);
-    chartCtx.fillStyle = '#94a3b8';
-    chartCtx.fillText('Download', 28, 15);
+    chartCtx.font = '10px IBM Plex Mono, Courier New, monospace';
+    chartCtx.fillStyle = '#1a1a1a';
+    chartCtx.fillRect(10, 8, 12, 2);
+    chartCtx.fillStyle = '#888888';
+    chartCtx.fillText('download', 28, 12);
 
-    chartCtx.fillStyle = '#22c55e';
-    chartCtx.fillRect(100, 10, 12, 3);
-    chartCtx.fillStyle = '#94a3b8';
-    chartCtx.fillText('Upload', 118, 15);
+    chartCtx.fillStyle = '#888888';
+    chartCtx.fillRect(100, 8, 12, 2);
+    chartCtx.fillText('upload', 118, 12);
 }
 
 async function loadInterfaces() {
@@ -187,28 +196,28 @@ async function loadInterfaces() {
             <div class="interface-card">
                 <div class="interface-header">
                     <span class="interface-name">${iface.name}</span>
-                    <span class="interface-status ${iface.is_up ? 'up' : 'down'}">${iface.is_up ? 'UP' : 'DOWN'}</span>
+                    <span class="interface-status ${iface.is_up ? 'up' : 'down'}">${iface.is_up ? 'up' : 'down'}</span>
                 </div>
                 <div class="interface-details">
                     <div class="interface-detail">
-                        <span class="interface-detail-label">Speed</span>
+                        <span class="interface-detail-label">speed</span>
                         <span class="interface-detail-value">${iface.speed} Mbps</span>
                     </div>
                     <div class="interface-detail">
-                        <span class="interface-detail-label">MTU</span>
+                        <span class="interface-detail-label">mtu</span>
                         <span class="interface-detail-value">${iface.mtu}</span>
                     </div>
                     <div class="interface-detail">
-                        <span class="interface-detail-label">Sent</span>
+                        <span class="interface-detail-label">sent</span>
                         <span class="interface-detail-value">${formatBytes(iface.bytes_sent)}</span>
                     </div>
                     <div class="interface-detail">
-                        <span class="interface-detail-label">Received</span>
+                        <span class="interface-detail-label">recv</span>
                         <span class="interface-detail-value">${formatBytes(iface.bytes_recv)}</span>
                     </div>
                     ${iface.addresses.filter(a => a.family.includes('AF_INET')).map(a => `
                         <div class="interface-detail" style="grid-column: 1/-1">
-                            <span class="interface-detail-label">IPv4</span>
+                            <span class="interface-detail-label">ipv4</span>
                             <span class="interface-detail-value">${a.address} / ${a.netmask || 'N/A'}</span>
                         </div>
                     `).join('')}
@@ -234,8 +243,8 @@ async function loadConnections() {
                 <tr>
                     <td>${c.laddr || '-'}</td>
                     <td>${c.raddr || '-'}</td>
-                    <td><span class="status-badge ${statusClass}">${c.status}</span></td>
-                    <td>${c.type.includes('SOCK_STREAM') ? 'TCP' : 'UDP'}</td>
+                    <td><span class="status-badge ${statusClass}">${c.status.toLowerCase()}</span></td>
+                    <td>${c.type.includes('SOCK_STREAM') ? 'tcp' : 'udp'}</td>
                     <td>${c.pid || '-'}</td>
                 </tr>
             `;
@@ -253,17 +262,17 @@ function initPing() {
         const resultDiv = document.getElementById('ping-result');
         const btn = document.getElementById('ping-btn');
         btn.disabled = true;
-        resultDiv.textContent = 'Pinging ' + host + '...';
+        resultDiv.textContent = '> ping ' + host;
 
         try {
             const data = await fetch(API + '/api/ping?host=' + encodeURIComponent(host)).then(r => r.json());
             if (data.status === 'up') {
-                resultDiv.innerHTML = `<span style="color: var(--green)">&#10003; ${data.host} is UP</span> - Latency: ${data.latency}ms`;
+                resultDiv.innerHTML = `> ${data.host} is up <span style="color:var(--green)">[ok]</span> // ${data.latency}ms`;
             } else {
-                resultDiv.innerHTML = `<span style="color: var(--red)">&#10007; ${data.host} is DOWN</span>`;
+                resultDiv.innerHTML = `> ${data.host} is down <span style="color:var(--red)">[fail]</span>`;
             }
         } catch (e) {
-            resultDiv.innerHTML = `<span style="color: var(--red)">Error: ${e.message}</span>`;
+            resultDiv.innerHTML = `> error: ${e.message}`;
         }
         btn.disabled = false;
     });
@@ -276,7 +285,7 @@ function initScanner() {
         const status = document.getElementById('scan-status');
 
         btn.disabled = true;
-        status.textContent = 'Scanning...';
+        status.textContent = 'scanning...';
         status.style.color = 'var(--yellow)';
 
         try {
@@ -291,14 +300,14 @@ function initScanner() {
                 if (!data.in_progress) {
                     clearInterval(poll);
                     btn.disabled = false;
-                    status.textContent = data.devices.length + ' devices found';
+                    status.textContent = data.devices.length + ' found';
                     status.style.color = 'var(--green)';
                     renderDevices(data.devices);
                 }
             }, 1000);
         } catch (e) {
             btn.disabled = false;
-            status.textContent = 'Scan failed: ' + e.message;
+            status.textContent = 'error: ' + e.message;
             status.style.color = 'var(--red)';
         }
     });
@@ -308,7 +317,7 @@ function renderDevices(devices) {
     const grid = document.getElementById('devices-grid');
     grid.innerHTML = devices.map(d => `
         <div class="device-card">
-            <div class="device-icon">&#128225;</div>
+            <div class="device-icon">[device]</div>
             <div class="device-ip">${d.ip}</div>
             <div class="device-mac">${d.mac}</div>
             <div class="device-vendor">${d.vendor}</div>
