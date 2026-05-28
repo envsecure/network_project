@@ -58,130 +58,174 @@ single unified interface.
 
 ### 2.1 System Flow Diagram
 
-```
-+------------------+     +------------------+     +------------------+
-|                  |     |                  |     |                  |
-|   User Browser   |---->|  Flask Server    |---->|  Network Monitor |
-|   (Frontend)     |<----|  (Backend)       |<----|  (psutil/sys)    |
-|                  |     |                  |     |                  |
-+------------------+     +------------------+     +------------------+
-        |                        |                        |
-        |                        |                        |
-        v                        v                        v
-+------------------+     +------------------+     +------------------+
-|                  |     |                  |     |                  |
-|  HTML/CSS/JS     |     |  REST API        |     |  OS Kernel       |
-|  Canvas Charts   |     |  WebSocket       |     |  Network Stack   |
-|                  |     |  Broadcast       |     |  System Commands |
-|                  |     |                  |     |                  |
-+------------------+     +------------------+     +------------------+
+```mermaid
+graph TB
+    subgraph Frontend["User Browser"]
+        A1[HTML/CSS/JS]
+        A2[Canvas Charts]
+    end
+
+    subgraph Backend["Flask Server"]
+        B1[REST API]
+        B2[WebSocket]
+        B3[Broadcast Thread]
+    end
+
+    subgraph Monitor["Network Monitor"]
+        C1[psutil]
+        C2[netifaces]
+        C3[scapy]
+    end
+
+    subgraph OS["Operating System"]
+        D1[OS Kernel]
+        D2[Network Stack]
+    end
+
+    subgraph External["External Network"]
+        E1[Gateway]
+        E2[DNS Server]
+        E3[Network Devices]
+    end
+
+    A1 -->|HTTP Request| B1
+    A2 -->|WebSocket| B2
+    B1 --> C1
+    B2 --> B3
+    B3 --> C1
+    C1 --> D1
+    C2 --> D1
+    C3 -->|ARP| E3
+    C1 -->|ICMP Ping| E1
+    C1 -->|ICMP Ping| E2
+    B1 -->|JSON Response| A1
+    B2 -->|JSON Push| A2
 ```
 
 ### 2.2 Application Flow Diagram
 
-```
-START
-  |
-  v
-[Launch Flask Server]
-  |
-  v
-[Start Broadcast Thread]----->[Collect Metrics Every 1s]----->[Push via WebSocket]
-  |
-  v
-[User Opens Browser]
-  |
-  v
-[Load Dashboard]----->[Display Health Score]
-  |                    [Display Bandwidth Charts]
-  |                    [Display Connection Stats]
-  |
-  v
-[User Navigates Tabs]
-  |
-  +---->[Analytics Tab]----->[Load Advanced Charts]
-  |
-  +---->[Interfaces Tab]----->[Show Interface Cards + Chart]
-  |
-  +---->[Connections Tab]----->[Show Active Connections Table]
-  |
-  +---->[Scanner Tab]----->[User Enters Subnet]---->[Click Scan]
-  |                                                    |
-  |                                                    v
-  |                                            [Send ARP Packets]
-  |                                                    |
-  |                                                    v
-  |                                            [Display Devices]
-  |
-  v
-[User Uses Ping Tool]----->[Enter Host]---->[Click Run]---->[Display Result]
-  |
-  v
-[WebSocket Updates Charts Continuously]
-  |
-  v
-END (User Closes Browser)
+```mermaid
+graph TD
+    START([Start]) --> A[Launch Flask Server]
+    A --> B[Start Broadcast Thread]
+    B --> C[Collect Metrics Every 1s]
+    C --> D[Push via WebSocket]
+    D --> C
+
+    A --> E[User Opens Browser]
+    E --> F[Load Dashboard]
+    F --> G[Display Health Score]
+    F --> H[Display Bandwidth Charts]
+    F --> I[Display Connection Stats]
+
+    F --> J[User Navigates Tabs]
+    J --> K[Analytics Tab]
+    J --> L[Interfaces Tab]
+    J --> M[Connections Tab]
+    J --> N[Scanner Tab]
+
+    K --> O[Load Advanced Charts]
+    L --> P[Show Interface Cards]
+    M --> Q[Show Connections Table]
+    N --> R[User Enters Subnet]
+    R --> S[Click Scan]
+    S --> T[Send ARP Packets]
+    T --> U[Display Devices]
+
+    F --> V[User Uses Ping Tool]
+    V --> W[Enter Host]
+    W --> X[Click Run]
+    X --> Y[Display Result]
+
+    F --> Z[WebSocket Updates Charts]
+    Z --> Z
+
+    STOP([End])
 ```
 
 ### 2.3 Data Flow Diagram
 
-```
-+-----------+          +-----------+          +-----------+
-|           |  HTTP    |           |  psutil  |           |
-|  Browser  |--------->|  Flask    |--------->|  OS       |
-|           |<---------|  Server   |<---------|  Kernel   |
-|           |  JSON    |           |  Counters|           |
-+-----------+          +-----------+          +-----------+
-     |                      |                      |
-     | WebSocket            | Thread               | ARP
-     v                      v                      v
-+-----------+          +-----------+          +-----------+
-|           |  Push    |           |  Send    |           |
-|  Live     |<---------|  Broadcast|--------->|  Network  |
-|  Charts   |  Data    |  Thread   |  Packets |  Devices  |
-|           |          |           |          |           |
-+-----------+          +-----------+          +-----------+
+```mermaid
+graph LR
+    subgraph Browser["Browser"]
+        A1[HTTP Client]
+        A2[WebSocket Client]
+    end
+
+    subgraph Server["Flask Server"]
+        B1[Route Handler]
+        B2[Broadcast Thread]
+    end
+
+    subgraph Monitor["Network Monitor"]
+        C1[NetworkMonitor]
+    end
+
+    subgraph System["OS Kernel"]
+        D1[psutil Counters]
+        D2[System Commands]
+    end
+
+    subgraph Network["Network"]
+        E1[Local Devices]
+        E2[Internet]
+    end
+
+    A1 -->|HTTP GET| B1
+    A2 <-->|WebSocket| B2
+    B1 --> C1
+    B2 --> C1
+    C1 --> D1
+    C1 --> D2
+    D2 -->|ping| E2
+    C1 -->|ARP| E1
+    B1 -->|JSON| A1
+    B2 -->|JSON Push| A2
 ```
 
 ### 2.4 Health Score Calculation Flow
 
-```
-START: Score = 100
-  |
-  v
-[Ping Gateway]----->[Failed?]----->Score = Score - 30
-  |                      |
-  |                      v
-  |               [High Latency?]----->Score = Score - 10
-  |
-  v
-[Ping DNS]--------->[Failed?]----->Score = Score - 20
-  |                      |
-  |                      v
-  |               [High Latency?]----->Score = Score - 5
-  |                      |
-  |                      v
-  |               [No DNS?]----->Score = Score - 10
-  |
-  v
-[Check Errors]----->[Errors > 100?]----->Score = Score - 15
-  |
-  v
-[Check Drops]----->[Drops > 50?]----->Score = Score - 15
-  |
-  v
-[Clamp Score: 0-100]
-  |
-  v
-[Map to Status]
-  |
-  +---->80-100: excellent
-  +---->60-79: good
-  +---->40-59: fair
-  +---->0-39: poor
-  |
-  v
-RETURN Score + Status
+```mermaid
+graph TD
+    A[Start: Score = 100] --> B{Gateway reachable?}
+    B -->|No| C[Score = Score - 30]
+    B -->|Yes| D{High latency?}
+    D -->|Yes| E[Score = Score - 10]
+    D -->|No| F[Continue]
+    C --> F
+    E --> F
+
+    F --> G{DNS configured?}
+    G -->|No| H[Score = Score - 10]
+    G -->|Yes| I{DNS reachable?}
+    I -->|No| J[Score = Score - 20]
+    I -->|Yes| K{High latency?}
+    K -->|Yes| L[Score = Score - 5]
+    K -->|No| M[Continue]
+    H --> M
+    J --> M
+    L --> M
+
+    M --> N{Errors > 100?}
+    N -->|Yes| O[Score = Score - 15]
+    N -->|No| P[Continue]
+    O --> P
+
+    P --> Q{Drops > 50?}
+    Q -->|Yes| R[Score = Score - 15]
+    Q -->|No| S[Continue]
+    R --> S
+
+    S --> T[Clamp: 0 to 100]
+    T --> U{Score range?}
+    U -->|80-100| V[excellent]
+    U -->|60-79| W[good]
+    U -->|40-59| X[fair]
+    U -->|0-39| Y[poor]
+    V --> Z[Return Score]
+    W --> Z
+    X --> Z
+    Y --> Z
 ```
 
 ---

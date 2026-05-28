@@ -250,9 +250,9 @@ Gets process information by PID.
 graph LR
     A[psutil.Process] --> B[PID Input]
     B --> C[Process Object]
-    C --> D[name()]
-    C --> E[exe()]
-    C --> F[cmdline()]
+    C --> D["name()"]
+    C --> E["exe()"]
+    C --> F["cmdline()"]
 ```
 
 **Used in:** `get_listening_ports()` (to get process name for each listening port)
