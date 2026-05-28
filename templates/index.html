@@ -14,10 +14,10 @@
         </div>
         <div class="nav-links">
             <button class="nav-btn active" data-tab="dashboard">dashboard</button>
+            <button class="nav-btn" data-tab="analytics">analytics</button>
             <button class="nav-btn" data-tab="interfaces">interfaces</button>
             <button class="nav-btn" data-tab="connections">connections</button>
             <button class="nav-btn" data-tab="scanner">scanner</button>
-            <button class="nav-btn" data-tab="analytics">analytics</button>
         </div>
         <div class="nav-status">
             <span id="auto-refresh-status" class="status-dot green"></span>
@@ -128,19 +128,8 @@
                     <canvas id="connection-status-chart"></canvas>
                 </div>
                 <div class="chart-card">
-                    <div class="card-header">listening_ports_list</div>
-                    <div class="table-wrapper" style="border: none;">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>port</th>
-                                    <th>process</th>
-                                    <th>pid</th>
-                                </tr>
-                            </thead>
-                            <tbody id="listening-tbody-small"></tbody>
-                        </table>
-                    </div>
+                    <div class="card-header">top_ports_by_connections</div>
+                    <canvas id="dashboard-top-ports-chart"></canvas>
                 </div>
             </div>
 

@@ -5,7 +5,7 @@ let packetsHistory = [];
 let ws = null;
 let reconnectTimer = null;
 
-let bwCtx, errCtx, pktCtx, ifaceCtx, connCtx, ifaceCompareCtx;
+let bwCtx, errCtx, pktCtx, ifaceCtx, connCtx, ifaceCompareCtx, dashTopPortsCtx;
 let analyticsIfaceBwCtx, analyticsConnTrendCtx, analyticsProtocolCtx;
 let analyticsTopPortsCtx, analyticsRatioCtx, analyticsLatencyCtx;
 let latencyHistory = [];
@@ -89,6 +89,7 @@ function initCharts() {
     pktCtx = setupCanvas('packets-chart', 220);
     ifaceCtx = setupCanvas('interface-chart', 220);
     connCtx = setupCanvas('connection-status-chart', 280);
+    dashTopPortsCtx = setupCanvas('dashboard-top-ports-chart', 280);
     ifaceCompareCtx = setupCanvas('iface-compare-chart', 260);
     analyticsIfaceBwCtx = setupCanvas('analytics-iface-bw-chart', 260);
     analyticsConnTrendCtx = setupCanvas('analytics-conn-trend-chart', 260);
@@ -121,23 +122,24 @@ function loadInitialData() {
 
 async function loadDashboard() {
     try {
-        const [summary, listening, interfaces] = await Promise.all([
+        const [summary, listening, interfaces, connData] = await Promise.all([
             fetch(API + '/api/summary').then(r => r.json()),
             fetch(API + '/api/listening').then(r => r.json()),
-            fetch(API + '/api/interfaces').then(r => r.json())
+            fetch(API + '/api/interfaces').then(r => r.json()),
+            fetch(API + '/api/analytics/connections').then(r => r.json()),
         ]);
 
         updateHealth(summary.health);
         updateBandwidth(summary.bandwidth);
         updateStats(summary);
         updateListeningPorts(listening);
-        updateListeningPortsSmall(listening);
         updateBandwidthChart(summary.bandwidth);
         updateErrorsChart(summary.bandwidth);
         updatePacketsChart(summary.bandwidth);
         updateInterfaceChart(interfaces);
         updateConnectionStatusChart();
         updateIfaceCompareChart(interfaces);
+        drawDashboardTopPorts(connData);
     } catch (e) {
         console.error('Dashboard refresh error:', e);
     }
@@ -475,6 +477,46 @@ function updateInterfaceChart(interfaces) {
     });
 }
 
+// ==================== DASHBOARD TOP PORTS ====================
+
+function drawDashboardTopPorts(connData) {
+    const { w, h } = getCanvasSize('dashboard-top-ports-chart');
+    if (!dashTopPortsCtx || w === 0) return;
+
+    dashTopPortsCtx.clearRect(0, 0, w, h);
+
+    const ports = connData.top_ports.slice(0, 8);
+    if (ports.length === 0) {
+        dashTopPortsCtx.font = FONT;
+        dashTopPortsCtx.fillStyle = COL_LIGHT;
+        dashTopPortsCtx.fillText('no ports', 60, h / 2);
+        return;
+    }
+
+    const maxCount = Math.max(...ports.map(p => p.count), 1);
+    const left = 60, top = 10, bot = 10, right = 20;
+    const ch = h - top - bot;
+    const barH = Math.min(26, (ch / ports.length) - 6);
+    const gap = (ch - barH * ports.length) / (ports.length + 1);
+
+    ports.forEach((port, i) => {
+        const y = top + gap + i * (barH + gap);
+        const barW = (port.count / maxCount) * (w - left - right);
+
+        dashTopPortsCtx.fillStyle = COL_BLUE;
+        dashTopPortsCtx.fillRect(left, y, Math.max(barW, 3), barH);
+
+        dashTopPortsCtx.font = FONT_SM;
+        dashTopPortsCtx.fillStyle = COL_TEXT;
+        dashTopPortsCtx.textAlign = 'right';
+        dashTopPortsCtx.fillText(':' + port.port, left - 6, y + barH / 2 + 4);
+        dashTopPortsCtx.textAlign = 'left';
+
+        dashTopPortsCtx.fillStyle = COL_MUTED;
+        dashTopPortsCtx.fillText(port.count, left + Math.max(barW, 3) + 6, y + barH / 2 + 4);
+    });
+}
+
 // ==================== CONNECTION PIE ====================
 
 function updateConnectionStatusChart() {
@@ -759,10 +801,10 @@ async function loadAnalytics() {
             drawProtocolChart(connData);
             drawTopPortsChart(connData);
             drawRatioChart(ratio);
+            drawLatencyChart(latency);
         }, 100);
 
         updateConnTrend(connData.total);
-        drawLatencyChart(latency);
     } catch (e) {
         console.error('Analytics load error:', e);
     }
