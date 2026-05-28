@@ -1,14 +1,52 @@
 from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
+from flask_sock import Sock
 from network_monitor import NetworkMonitor
 import threading
 import time
+import json
 
 app = Flask(__name__)
 CORS(app)
+sock = Sock(app)
 
 monitor = NetworkMonitor()
 scan_in_progress = False
+ws_clients = []
+
+
+def broadcast_data():
+    while True:
+        if ws_clients:
+            try:
+                health = monitor.get_network_health()
+                bandwidth = monitor.get_bandwidth()
+                interfaces = monitor.get_interface_info()
+                listening = monitor.get_listening_ports()
+                active_ifaces = sum(1 for i in interfaces if i["is_up"])
+
+                data = json.dumps({
+                    "type": "update",
+                    "health": health,
+                    "bandwidth": bandwidth,
+                    "active_interfaces": active_ifaces,
+                    "total_interfaces": len(interfaces),
+                    "listening_ports": len(listening),
+                    "timestamp": time.time(),
+                })
+
+                for client in ws_clients[:]:
+                    try:
+                        client.send(data)
+                    except Exception:
+                        ws_clients.remove(client)
+            except Exception:
+                pass
+        time.sleep(1)
+
+
+broadcast_thread = threading.Thread(target=broadcast_data, daemon=True)
+broadcast_thread.start()
 
 
 @app.route("/")
@@ -108,6 +146,19 @@ def api_summary():
         "wifi": wifi,
         "timestamp": time.time(),
     })
+
+
+@sock.route("/ws")
+def websocket(ws):
+    ws_clients.append(ws)
+    try:
+        while True:
+            ws.receive()
+    except Exception:
+        pass
+    finally:
+        if ws in ws_clients:
+            ws_clients.remove(ws)
 
 
 if __name__ == "__main__":
