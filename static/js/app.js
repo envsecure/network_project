@@ -4,7 +4,7 @@ let errorsHistory = [];
 let packetsHistory = [];
 let refreshInterval = null;
 
-let bwCtx, errCtx, pktCtx, ifaceCtx, connCtx;
+let bwCtx, errCtx, pktCtx, ifaceCtx, connCtx, ifaceCompareCtx;
 
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
@@ -38,7 +38,8 @@ function initCharts() {
     errCtx = setupCanvas('errors-chart', 220);
     pktCtx = setupCanvas('packets-chart', 220);
     ifaceCtx = setupCanvas('interface-chart', 220);
-    connCtx = setupCanvas('connection-status-chart', 220);
+    connCtx = setupCanvas('connection-status-chart', 280);
+    ifaceCompareCtx = setupCanvas('iface-compare-chart', 260);
 }
 
 function setupCanvas(id, height) {
@@ -77,6 +78,7 @@ async function loadDashboard() {
         updatePacketsChart(summary.bandwidth);
         updateInterfaceChart(interfaces);
         updateConnectionStatusChart();
+        updateIfaceCompareChart(interfaces);
     } catch (e) {
         console.error('Dashboard refresh error:', e);
     }
@@ -208,7 +210,7 @@ function updateBandwidthChart(bw) {
 
     // Download fill
     bwCtx.beginPath();
-    bwCtx.fillStyle = 'rgba(0,0,0,0.06)';
+    bwCtx.fillStyle = 'rgba(0, 90, 200, 0.08)';
     bandwidthHistory.forEach((d, i) => {
         const x = left + i * step;
         const y = h - bot - (d.down / maxVal) * (h - top - bot);
@@ -220,7 +222,7 @@ function updateBandwidthChart(bw) {
 
     // Download line
     bwCtx.beginPath();
-    bwCtx.strokeStyle = COL_TEXT;
+    bwCtx.strokeStyle = '#0055cc';
     bwCtx.lineWidth = 2.5;
     bandwidthHistory.forEach((d, i) => {
         const x = left + i * step;
@@ -231,7 +233,7 @@ function updateBandwidthChart(bw) {
 
     // Upload line
     bwCtx.beginPath();
-    bwCtx.strokeStyle = COL_LIGHT;
+    bwCtx.strokeStyle = '#1a8a3a';
     bwCtx.lineWidth = 2;
     bwCtx.setLineDash([6, 4]);
     bandwidthHistory.forEach((d, i) => {
@@ -243,8 +245,8 @@ function updateBandwidthChart(bw) {
     bwCtx.setLineDash([]);
 
     drawLegend(bwCtx, [
-        { color: COL_TEXT, label: 'download' },
-        { color: COL_LIGHT, label: 'upload' }
+        { color: '#0055cc', label: 'download' },
+        { color: '#1a8a3a', label: 'upload' }
     ]);
 }
 
@@ -412,12 +414,13 @@ function drawConnectionPie(counts) {
     }
 
     const total = entries.reduce((s, e) => s + e[1], 0);
-    const r = Math.min(70, h / 2 - 20);
-    const cx = r + 30;
+    const maxR = Math.min(w * 0.35, h * 0.42);
+    const r = Math.max(maxR, 50);
+    const cx = r + 40;
     const cy = h / 2;
 
     const colors = {
-        'ESTABLISHED': '#000000', 'LISTEN': '#333333', 'TIME_WAIT': '#8a5e00',
+        'ESTABLISHED': '#0055cc', 'LISTEN': '#1a8a3a', 'TIME_WAIT': '#8a5e00',
         'CLOSE_WAIT': '#991111', 'SYN_SENT': '#555555', 'SYN_RECEIVED': '#777777',
         'FIN_WAIT_1': '#999999', 'FIN_WAIT_2': '#aaaaaa', 'CLOSING': '#666666',
         'LAST_ACK': '#444444', 'UNKNOWN': '#bbbbbb'
@@ -438,16 +441,26 @@ function drawConnectionPie(counts) {
         angle += slice;
     });
 
-    const lx = cx + r + 24;
+    // Center text
+    connCtx.font = 'bold 16px IBM Plex Mono, Courier New, monospace';
+    connCtx.fillStyle = COL_TEXT;
+    connCtx.textAlign = 'center';
+    connCtx.fillText(total, cx, cy - 2);
+    connCtx.font = FONT_SM;
+    connCtx.fillStyle = COL_MUTED;
+    connCtx.fillText('total', cx, cy + 16);
+    connCtx.textAlign = 'left';
+
+    const lx = cx + r + 30;
     let ly = 16;
     connCtx.font = FONT_SM;
     entries.forEach(([status, count]) => {
         if (ly > h - 10) return;
         connCtx.fillStyle = colors[status] || '#cccccc';
-        connCtx.fillRect(lx, ly - 4, 12, 12);
+        connCtx.fillRect(lx, ly - 4, 14, 14);
         connCtx.fillStyle = COL_TEXT;
-        connCtx.fillText(status.toLowerCase() + ' (' + count + ')', lx + 18, ly + 7);
-        ly += 22;
+        connCtx.fillText(status.toLowerCase() + ' (' + count + ')', lx + 20, ly + 8);
+        ly += 24;
     });
 }
 
@@ -456,6 +469,10 @@ function drawConnectionPie(counts) {
 async function loadInterfaces() {
     try {
         const data = await fetch(API + '/api/interfaces').then(r => r.json());
+        setTimeout(() => {
+            initCharts();
+            updateIfaceCompareChart(data);
+        }, 100);
         document.getElementById('interfaces-list').innerHTML = data.map(iface => `
             <div class="interface-card">
                 <div class="interface-header">
@@ -508,6 +525,76 @@ async function loadConnections() {
     } catch (e) {
         console.error('Load connections error:', e);
     }
+}
+
+// ==================== INTERFACE COMPARE CHART ====================
+
+function updateIfaceCompareChart(interfaces) {
+    const { w, h } = getCanvasSize('iface-compare-chart');
+    if (!ifaceCompareCtx || w === 0) return;
+
+    ifaceCompareCtx.clearRect(0, 0, w, h);
+
+    const active = interfaces.filter(i => i.is_up);
+    if (active.length === 0) {
+        ifaceCompareCtx.font = FONT;
+        ifaceCompareCtx.fillStyle = COL_LIGHT;
+        ifaceCompareCtx.fillText('no active interfaces', 60, h / 2);
+        return;
+    }
+
+    const left = 60;
+    const top = 30;
+    const bot = 40;
+    const right = 20;
+    const cw = w - left - right;
+    const ch = h - top - bot;
+
+    const maxBytes = Math.max(...active.map(i => Math.max(i.bytes_sent, i.bytes_recv)), 1024);
+
+    // Grid
+    drawGrid(ifaceCompareCtx, w, h, 5, top, bot);
+    drawYLabels(ifaceCompareCtx, h, maxBytes, 5, top, bot);
+
+    const groupW = cw / active.length;
+    const barW = Math.min(groupW * 0.3, 40);
+    const gap = 6;
+
+    active.forEach((iface, i) => {
+        const gx = left + i * groupW + groupW / 2;
+
+        // Sent bar
+        const sentH = (iface.bytes_sent / maxBytes) * ch;
+        ifaceCompareCtx.fillStyle = '#0055cc';
+        ifaceCompareCtx.fillRect(gx - barW - gap / 2, h - bot - sentH, barW, sentH);
+
+        // Recv bar
+        const recvH = (iface.bytes_recv / maxBytes) * ch;
+        ifaceCompareCtx.fillStyle = '#1a8a3a';
+        ifaceCompareCtx.fillRect(gx + gap / 2, h - bot - recvH, barW, recvH);
+
+        // Value labels on top of bars
+        ifaceCompareCtx.font = FONT_SM;
+        ifaceCompareCtx.textAlign = 'center';
+        ifaceCompareCtx.fillStyle = '#0055cc';
+        if (sentH > 15) ifaceCompareCtx.fillText(formatBytesShort(iface.bytes_sent), gx - barW / 2 - gap / 2, h - bot - sentH - 6);
+        ifaceCompareCtx.fillStyle = '#1a8a3a';
+        if (recvH > 15) ifaceCompareCtx.fillText(formatBytesShort(iface.bytes_recv), gx + barW / 2 + gap / 2, h - bot - recvH - 6);
+
+        // Interface name at bottom
+        ifaceCompareCtx.fillStyle = COL_MUTED;
+        ifaceCompareCtx.font = FONT_SM;
+        const name = iface.name.length > 12 ? iface.name.substring(0, 10) + '..' : iface.name;
+        ifaceCompareCtx.fillText(name, gx, h - 10);
+    });
+
+    ifaceCompareCtx.textAlign = 'left';
+
+    // Legend
+    drawLegend(ifaceCompareCtx, [
+        { color: '#0055cc', label: 'sent' },
+        { color: '#1a8a3a', label: 'recv' }
+    ], left, 16);
 }
 
 // ==================== PING ====================
