@@ -4,7 +4,7 @@ import time
 import subprocess
 import sys
 import os
-import signal
+import argparse
 from datetime import datetime
 
 BASE_URL = "http://localhost:5000"
@@ -379,6 +379,24 @@ def test_api_analytics_traffic_ratio():
                "FAIL", str(e))
 
 
+def run_api_tests():
+    print()
+    print("[*] Running API Endpoint Tests...")
+    print("-" * 40)
+    test_api_health()
+    test_api_bandwidth()
+    test_api_interfaces()
+    test_api_connections()
+    test_api_listening()
+    test_api_ping_valid()
+    test_api_ping_invalid()
+    test_api_summary()
+    test_api_scan()
+    test_api_scan_results()
+    test_api_analytics_connections()
+    test_api_analytics_traffic_ratio()
+
+
 # ==================== WEBSOCKET TESTS ====================
 
 def test_ws_connection():
@@ -459,9 +477,17 @@ def test_ws_reconnection():
                 pass
 
 
+def run_ws_tests():
+    print()
+    print("[*] Running WebSocket Tests...")
+    print("-" * 40)
+    test_ws_connection()
+    test_ws_reconnection()
+
+
 # ==================== FRONTEND TESTS ====================
 
-def get_selenium_driver():
+def get_selenium_driver(visible=False):
     try:
         from selenium import webdriver
         from selenium.webdriver.chrome.service import Service
@@ -471,10 +497,13 @@ def get_selenium_driver():
         return None
 
     options = Options()
-    options.add_argument("--headless")
+    if not visible:
+        options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
+    if visible:
+        options.add_argument("--start-maximized")
 
     try:
         driver = webdriver.Chrome(options=options)
@@ -493,29 +522,37 @@ def get_selenium_driver():
             return None
 
 
-def test_frontend_dashboard():
-    driver = get_selenium_driver()
+def test_frontend_dashboard(visible=False):
+    driver = get_selenium_driver(visible=visible)
     if not driver:
         record("TC-FE-001", "Dashboard loads with all components", "FAIL",
                "Selenium/webdriver not available")
         return
     try:
+        print("    Opening browser...")
         driver.get(f"{BASE_URL}/")
         time.sleep(3)
+        print("    Page loaded. Checking components...")
 
         errors = []
 
         score_circle = driver.find_elements("css selector", "#score-circle")
         if not score_circle:
             errors.append("health score circle not found")
+        else:
+            print("    [OK] Health score circle found")
 
         stat_cards = driver.find_elements("css selector", ".stat-card")
         if len(stat_cards) < 4:
             errors.append(f"expected 4 stat cards, found {len(stat_cards)}")
+        else:
+            print(f"    [OK] {len(stat_cards)} stat cards found")
 
         bw_chart = driver.find_elements("css selector", "#bandwidth-chart")
         if not bw_chart:
             errors.append("bandwidth chart not found")
+        else:
+            print("    [OK] Bandwidth chart found")
 
         if errors:
             record("TC-FE-001", "Dashboard loads with all components", "FAIL",
@@ -528,13 +565,14 @@ def test_frontend_dashboard():
         driver.quit()
 
 
-def test_frontend_tabs():
-    driver = get_selenium_driver()
+def test_frontend_tabs(visible=False):
+    driver = get_selenium_driver(visible=visible)
     if not driver:
         record("TC-FE-002", "Tab navigation switches views correctly", "FAIL",
                "Selenium/webdriver not available")
         return
     try:
+        print("    Opening browser...")
         driver.get(f"{BASE_URL}/")
         time.sleep(2)
 
@@ -547,23 +585,31 @@ def test_frontend_tabs():
         errors = []
 
         for tab_name, selector in tabs.items():
+            print(f"    Clicking '{tab_name}' tab...")
             btn = driver.find_element("css selector",
                                       f'button[data-tab="{tab_name}"]')
             btn.click()
-            time.sleep(0.5)
+            time.sleep(1)
 
             tab_section = driver.find_element("css selector", selector)
             classes = tab_section.get_attribute("class")
             if "active" not in classes:
                 errors.append(f"{tab_name} tab not active after click")
+                print(f"    [FAIL] {tab_name} tab not active")
+            else:
+                print(f"    [OK] {tab_name} tab active")
 
+        print("    Clicking 'dashboard' tab...")
         dashboard_btn = driver.find_element("css selector",
                                             'button[data-tab="dashboard"]')
         dashboard_btn.click()
-        time.sleep(0.5)
+        time.sleep(1)
         dash = driver.find_element("css selector", "#tab-dashboard")
         if "active" not in dash.get_attribute("class"):
             errors.append("dashboard tab not active after click")
+            print("    [FAIL] dashboard tab not active")
+        else:
+            print("    [OK] dashboard tab active")
 
         if errors:
             record("TC-FE-002", "Tab navigation switches views correctly", "FAIL",
@@ -576,29 +622,27 @@ def test_frontend_tabs():
         driver.quit()
 
 
-def test_frontend_realtime_updates():
-    driver = get_selenium_driver()
+def test_frontend_realtime_updates(visible=False):
+    driver = get_selenium_driver(visible=visible)
     if not driver:
         record("TC-FE-003", "Charts update in real-time via WebSocket", "FAIL",
                "Selenium/webdriver not available")
         return
     try:
+        print("    Opening browser...")
         driver.get(f"{BASE_URL}/")
         time.sleep(3)
 
         score1 = driver.execute_script(
             "return document.getElementById('score-text').textContent")
+        print(f"    Initial score: {score1}")
 
+        print("    Waiting 10s for WebSocket updates...")
         time.sleep(10)
 
         score2 = driver.execute_script(
             "return document.getElementById('score-text').textContent")
-
-        upload1 = driver.execute_script(
-            "return document.getElementById('upload-speed').textContent")
-        time.sleep(1)
-        upload2 = driver.execute_script(
-            "return document.getElementById('upload-speed').textContent")
+        print(f"    Updated score: {score2}")
 
         if score2 and score2 != "--":
             record("TC-FE-003", "Charts update in real-time via WebSocket", "PASS")
@@ -611,27 +655,32 @@ def test_frontend_realtime_updates():
         driver.quit()
 
 
-def test_frontend_ping_tool():
-    driver = get_selenium_driver()
+def test_frontend_ping_tool(visible=False):
+    driver = get_selenium_driver(visible=visible)
     if not driver:
         record("TC-FE-004", "Ping tool tests connectivity", "FAIL",
                "Selenium/webdriver not available")
         return
     try:
+        print("    Opening browser...")
         driver.get(f"{BASE_URL}/")
         time.sleep(2)
 
+        print("    Clearing ping input and typing 8.8.8.8...")
         ping_input = driver.find_element("css selector", "#ping-host")
         ping_input.clear()
         ping_input.send_keys("8.8.8.8")
 
+        print("    Clicking 'run' button...")
         ping_btn = driver.find_element("css selector", "#ping-btn")
         ping_btn.click()
 
+        print("    Waiting for result...")
         time.sleep(6)
 
         result = driver.find_element("css selector", "#ping-result")
         result_text = result.text.strip().lower()
+        print(f"    Ping result: {result_text}")
 
         if not result_text:
             record("TC-FE-004", "Ping tool tests connectivity", "FAIL",
@@ -646,25 +695,40 @@ def test_frontend_ping_tool():
         driver.quit()
 
 
+def run_frontend_tests(visible=False):
+    print()
+    label = "VISUAL" if visible else "HEADLESS"
+    print(f"[*] Running Frontend Tests ({label} mode)...")
+    print("-" * 40)
+    test_frontend_dashboard(visible=visible)
+    test_frontend_tabs(visible=visible)
+    test_frontend_realtime_updates(visible=visible)
+    test_frontend_ping_tool(visible=visible)
+
+
 # ==================== SCANNER TESTS ====================
 
-def test_scanner_network_scan():
-    driver = get_selenium_driver()
+def test_scanner_network_scan(visible=False):
+    driver = get_selenium_driver(visible=visible)
     if not driver:
         record("TC-SC-001", "ARP scan discovers network devices", "FAIL",
                "Selenium/webdriver not available")
         return
     try:
+        print("    Opening browser...")
         driver.get(f"{BASE_URL}/")
         time.sleep(2)
 
+        print("    Clicking 'scanner' tab...")
         scanner_btn = driver.find_element("css selector", 'button[data-tab="scanner"]')
         scanner_btn.click()
         time.sleep(1)
 
+        print("    Clicking 'scan' button...")
         scan_btn = driver.find_element("css selector", "#scan-btn")
         scan_btn.click()
 
+        print("    Waiting for scan to complete...")
         time.sleep(10)
 
         status = driver.find_element("css selector", "#scan-status")
@@ -673,6 +737,7 @@ def test_scanner_network_scan():
         devices = driver.find_elements("css selector", "#devices-grid .device-card")
 
         if len(devices) > 0:
+            print(f"    [OK] {len(devices)} devices found")
             record("TC-SC-001", "ARP scan discovers network devices", "PASS")
         elif "scanning" in status_text:
             record("TC-SC-001", "ARP scan discovers network devices", "PASS",
@@ -686,27 +751,32 @@ def test_scanner_network_scan():
         driver.quit()
 
 
-def test_scanner_custom_subnet():
-    driver = get_selenium_driver()
+def test_scanner_custom_subnet(visible=False):
+    driver = get_selenium_driver(visible=visible)
     if not driver:
         record("TC-SC-002", "Scan with custom subnet", "FAIL",
                "Selenium/webdriver not available")
         return
     try:
+        print("    Opening browser...")
         driver.get(f"{BASE_URL}/")
         time.sleep(2)
 
+        print("    Clicking 'scanner' tab...")
         scanner_btn = driver.find_element("css selector", 'button[data-tab="scanner"]')
         scanner_btn.click()
         time.sleep(1)
 
+        print("    Typing subnet 192.168.1.0/24...")
         subnet_input = driver.find_element("css selector", "#scan-subnet")
         subnet_input.clear()
         subnet_input.send_keys("192.168.1.0/24")
 
+        print("    Clicking 'scan' button...")
         scan_btn = driver.find_element("css selector", "#scan-btn")
         scan_btn.click()
 
+        print("    Waiting for scan to complete...")
         time.sleep(10)
 
         status = driver.find_element("css selector", "#scan-status")
@@ -718,6 +788,15 @@ def test_scanner_custom_subnet():
         record("TC-SC-002", "Scan with custom subnet", "FAIL", str(e))
     finally:
         driver.quit()
+
+
+def run_scanner_tests(visible=False):
+    print()
+    label = "VISUAL" if visible else "HEADLESS"
+    print(f"[*] Running Device Scanner Tests ({label} mode)...")
+    print("-" * 40)
+    test_scanner_network_scan(visible=visible)
+    test_scanner_custom_subnet(visible=visible)
 
 
 # ==================== REPORT GENERATION ====================
@@ -917,50 +996,42 @@ def generate_report():
 # ==================== MAIN ====================
 
 def main():
+    parser = argparse.ArgumentParser(description="NetMonitor Automated Test Suite")
+    parser.add_argument("--api", action="store_true", help="Run only API tests")
+    parser.add_argument("--ws", action="store_true", help="Run only WebSocket tests")
+    parser.add_argument("--frontend", action="store_true",
+                        help="Run only Frontend tests (visible browser)")
+    parser.add_argument("--scanner", action="store_true",
+                        help="Run only Scanner tests (visible browser)")
+    parser.add_argument("--visible", action="store_true",
+                        help="Open browser visibly for frontend/scanner tests")
+    args = parser.parse_args()
+
+    run_all = not (args.api or args.ws or args.frontend or args.scanner)
+
     print("=" * 60)
     print("  NetMonitor Automated Test Suite")
     print("=" * 60)
+
+    if args.visible:
+        print("  [!] Browser will open visibly - watch the tests happen!")
     print()
 
     if not ensure_server():
         print("[!] Cannot proceed without server")
         sys.exit(1)
 
-    print()
-    print("[*] Running API Endpoint Tests...")
-    print("-" * 40)
-    test_api_health()
-    test_api_bandwidth()
-    test_api_interfaces()
-    test_api_connections()
-    test_api_listening()
-    test_api_ping_valid()
-    test_api_ping_invalid()
-    test_api_summary()
-    test_api_scan()
-    test_api_scan_results()
-    test_api_analytics_connections()
-    test_api_analytics_traffic_ratio()
+    if run_all or args.api:
+        run_api_tests()
 
-    print()
-    print("[*] Running WebSocket Tests...")
-    print("-" * 40)
-    test_ws_connection()
-    test_ws_reconnection()
+    if run_all or args.ws:
+        run_ws_tests()
 
-    print()
-    print("[*] Running Frontend Tests (Selenium)...")
-    print("-" * 40)
-    test_frontend_dashboard()
-    test_frontend_tabs()
-    test_frontend_realtime_updates()
-    test_frontend_ping_tool()
+    if run_all or args.frontend:
+        run_frontend_tests(visible=args.visible or run_all)
 
-    print()
-    print("[*] Running Device Scanner Tests...")
-    print("-" * 40)
-    test_scanner_network_scan()
-    test_scanner_custom_subnet()
+    if run_all or args.scanner:
+        run_scanner_tests(visible=args.visible or run_all)
 
     print()
     print("=" * 60)
