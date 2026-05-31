@@ -466,25 +466,31 @@ def get_selenium_driver():
         from selenium import webdriver
         from selenium.webdriver.chrome.service import Service
         from selenium.webdriver.chrome.options import Options
-        options = Options()
-        options.add_argument("--headless")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-        try:
-            driver = webdriver.Chrome(options=options)
-        except Exception:
-            try:
-                from webdriver_manager.chrome import ChromeDriverManager
-                driver = webdriver.Chrome(
-                    service=Service(ChromeDriverManager().install()),
-                    options=options,
-                )
-            except Exception:
-                return None
-        return driver
     except ImportError:
+        print("    [!] selenium package not installed. Run: pip install selenium")
         return None
+
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+
+    try:
+        driver = webdriver.Chrome(options=options)
+        return driver
+    except Exception as e1:
+        print(f"    [!] Direct Chrome failed: {e1}")
+        try:
+            from webdriver_manager.chrome import ChromeDriverManager
+            driver = webdriver.Chrome(
+                service=Service(ChromeDriverManager().install()),
+                options=options,
+            )
+            return driver
+        except Exception as e2:
+            print(f"    [!] webdriver-manager also failed: {e2}")
+            return None
 
 
 def test_frontend_dashboard():
