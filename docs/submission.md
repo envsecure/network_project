@@ -60,87 +60,68 @@ single unified interface.
 
 ```mermaid
 graph TB
-    subgraph Frontend["User Browser"]
+    subgraph FE["Browser"]
         A1[HTML/CSS/JS]
         A2[Canvas Charts]
     end
-
-    subgraph Backend["Flask Server"]
+    subgraph BE["Flask Server"]
         B1[REST API]
         B2[WebSocket]
-        B3[Broadcast Thread]
+        B3[Broadcast]
     end
-
-    subgraph Monitor["Network Monitor"]
+    subgraph NM["Network Monitor"]
         C1[psutil]
         C2[netifaces]
         C3[scapy]
     end
-
-    subgraph OS["Operating System"]
-        D1[OS Kernel]
-        D2[Network Stack]
+    subgraph OS["OS Kernel"]
+        D1[Kernel]
+        D2[Net Stack]
     end
-
-    subgraph External["External Network"]
+    subgraph EXT["External"]
         E1[Gateway]
-        E2[DNS Server]
-        E3[Network Devices]
+        E2[DNS]
+        E3[Devices]
     end
-
-    A1 -->|HTTP Request| B1
-    A2 -->|WebSocket| B2
+    A1 -->|HTTP| B1
+    A2 -->|WS| B2
     B1 --> C1
     B2 --> B3
     B3 --> C1
     C1 --> D1
     C2 --> D1
     C3 -->|ARP| E3
-    C1 -->|ICMP Ping| E1
-    C1 -->|ICMP Ping| E2
-    B1 -->|JSON Response| A1
-    B2 -->|JSON Push| A2
+    C1 -->|Ping| E1
+    C1 -->|Ping| E2
+    B1 -->|JSON| A1
+    B2 -->|JSON| A2
 ```
 
 ### 2.2 Application Flow Diagram
 
 ```mermaid
 graph TD
-    START([Start]) --> A[Launch Flask Server]
-    A --> B[Start Broadcast Thread]
-    B --> C[Collect Metrics Every 1s]
-    C --> D[Push via WebSocket]
+    S([Start]) --> A[Launch Server]
+    A --> B[Broadcast Thread]
+    B --> C[Collect 1s]
+    C --> D[WS Push]
     D --> C
-
-    A --> E[User Opens Browser]
+    A --> E[Browser Open]
     E --> F[Load Dashboard]
-    F --> G[Display Health Score]
-    F --> H[Display Bandwidth Charts]
-    F --> I[Display Connection Stats]
-
-    F --> J[User Navigates Tabs]
-    J --> K[Analytics Tab]
-    J --> L[Interfaces Tab]
-    J --> M[Connections Tab]
-    J --> N[Scanner Tab]
-
-    K --> O[Load Advanced Charts]
-    L --> P[Show Interface Cards]
-    M --> Q[Show Connections Table]
-    N --> R[User Enters Subnet]
-    R --> S[Click Scan]
-    S --> T[Send ARP Packets]
-    T --> U[Display Devices]
-
-    F --> V[User Uses Ping Tool]
-    V --> W[Enter Host]
-    W --> X[Click Run]
-    X --> Y[Display Result]
-
-    F --> Z[WebSocket Updates Charts]
-    Z --> Z
-
-    STOP([End])
+    F --> G[Health Score]
+    F --> H[Bandwidth Charts]
+    F --> I[Connections]
+    F --> J[Tabs]
+    J --> K[Analytics]
+    J --> L[Interfaces]
+    J --> M[Connections]
+    J --> N[Scanner]
+    N --> O[ARP Scan]
+    O --> P[Devices]
+    F --> Q[Ping Tool]
+    Q --> R[Result]
+    F --> S1[WS Updates]
+    S1 --> S1
 ```
 
 ### 2.3 Data Flow Diagram
@@ -149,30 +130,25 @@ graph TD
 graph LR
     subgraph Browser["Browser"]
         A1[HTTP Client]
-        A2[WebSocket Client]
+        A2[WS Client]
     end
-
-    subgraph Server["Flask Server"]
-        B1[Route Handler]
-        B2[Broadcast Thread]
+    subgraph Server["Flask"]
+        B1[Handler]
+        B2[Broadcast]
     end
-
-    subgraph Monitor["Network Monitor"]
-        C1[NetworkMonitor]
+    subgraph Monitor["Monitor"]
+        C1[NetMonitor]
     end
-
-    subgraph System["OS Kernel"]
-        D1[psutil Counters]
-        D2[System Commands]
+    subgraph OS["OS"]
+        D1[psutil]
+        D2[Commands]
     end
-
-    subgraph Network["Network"]
-        E1[Local Devices]
+    subgraph Net["Network"]
+        E1[Local]
         E2[Internet]
     end
-
-    A1 -->|HTTP GET| B1
-    A2 <-->|WebSocket| B2
+    A1 -->|GET| B1
+    A2 <-->|WS| B2
     B1 --> C1
     B2 --> C1
     C1 --> D1
@@ -180,49 +156,45 @@ graph LR
     D2 -->|ping| E2
     C1 -->|ARP| E1
     B1 -->|JSON| A1
-    B2 -->|JSON Push| A2
+    B2 -->|JSON| A2
 ```
 
 ### 2.4 Health Score Calculation Flow
 
 ```mermaid
 graph TD
-    A[Start: Score = 100] --> B{Gateway reachable?}
-    B -->|No| C[Score = Score - 30]
-    B -->|Yes| D{High latency?}
-    D -->|Yes| E[Score = Score - 10]
+    A[Score=100] --> B{GW OK?}
+    B -->|No| C[-30]
+    B -->|Yes| D{Latency?}
+    D -->|High| E[-10]
     D -->|No| F[Continue]
     C --> F
     E --> F
-
-    F --> G{DNS configured?}
-    G -->|No| H[Score = Score - 10]
-    G -->|Yes| I{DNS reachable?}
-    I -->|No| J[Score = Score - 20]
-    I -->|Yes| K{High latency?}
-    K -->|Yes| L[Score = Score - 5]
+    F --> G{DNS OK?}
+    G -->|No| H[-10]
+    G -->|Yes| I{DNS Ping?}
+    I -->|No| J[-20]
+    I -->|Yes| K{Latency?}
+    K -->|High| L[-5]
     K -->|No| M[Continue]
     H --> M
     J --> M
     L --> M
-
-    M --> N{Errors > 100?}
-    N -->|Yes| O[Score = Score - 15]
+    M --> N{Errors>100?}
+    N -->|Yes| O[-15]
     N -->|No| P[Continue]
     O --> P
-
-    P --> Q{Drops > 50?}
-    Q -->|Yes| R[Score = Score - 15]
+    P --> Q{Drops>50?}
+    Q -->|Yes| R[-15]
     Q -->|No| S[Continue]
     R --> S
-
-    S --> T[Clamp: 0 to 100]
-    T --> U{Score range?}
+    S --> T[Clamp 0-100]
+    T --> U{Score?}
     U -->|80-100| V[excellent]
     U -->|60-79| W[good]
     U -->|40-59| X[fair]
     U -->|0-39| Y[poor]
-    V --> Z[Return Score]
+    V --> Z[Return]
     W --> Z
     X --> Z
     Y --> Z
