@@ -101,27 +101,17 @@ graph TB
 
 ```mermaid
 graph TD
-    S([Start]) --> A[Launch Server]
-    A --> B[Broadcast Thread]
-    B --> C[Collect 1s]
-    C --> D[WS Push]
-    D --> C
-    A --> E[Browser Open]
-    E --> F[Load Dashboard]
-    F --> G[Health Score]
-    F --> H[Bandwidth Charts]
-    F --> I[Connections]
-    F --> J[Tabs]
-    J --> K[Analytics]
-    J --> L[Interfaces]
-    J --> M[Connections]
-    J --> N[Scanner]
-    N --> O[ARP Scan]
-    O --> P[Devices]
-    F --> Q[Ping Tool]
-    Q --> R[Result]
-    F --> S1[WS Updates]
-    S1 --> S1
+    S([Start]) --> A[Server]
+    A --> B[Broadcast]
+    B --> A
+    A --> D[Dashboard]
+    D --> E[Health]
+    D --> F[Bandwidth]
+    D --> G[Tabs]
+    G --> H[Analytics]
+    G --> I[Interfaces]
+    G --> J[Scanner]
+    D --> K[Ping]
 ```
 
 ### 2.3 Data Flow Diagram
