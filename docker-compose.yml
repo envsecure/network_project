@@ -1,0 +1,10 @@
+version: "3.8"
+
+services:
+  netmonitor:
+    build: .
+    network_mode: host
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    restart: unless-stopped
